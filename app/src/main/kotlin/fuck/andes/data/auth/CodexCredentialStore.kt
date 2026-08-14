@@ -112,7 +112,14 @@ internal class AndroidCodexCredentialStore(
             plaintext = cipher.doFinal(ciphertext)
             decodeCredential(plaintext)
         } catch (_: Exception) {
-            preferences.edit().remove(preferenceKey).commit()
+            val cleanupCommitted = try {
+                preferences.edit().remove(preferenceKey).commit()
+            } catch (_: Exception) {
+                false
+            }
+            if (!cleanupCommitted) {
+                throw CodexCredentialStoreException("cleanup")
+            }
             null
         } finally {
             envelope?.fill(0)

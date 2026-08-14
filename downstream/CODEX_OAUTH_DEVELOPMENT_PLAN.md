@@ -17,6 +17,64 @@
 - OAuth 失败不得自动回退到 API Key。
 - 真实 Codex 登录只用于最终人工验收；自动测试不得调用付费或真实 AI 服务。
 
+## 执行状态总表
+
+> 状态只使用“已完成 / 部分完成 / 进行中 / 未开始 / 待人工”。本表与下文复选框同步维护；只有当一个 Step 的全部要求均有证据时，才能将对应复选框改为 `[x]`。
+
+| Task / Step | 状态 | 证据或待办 |
+| --- | --- | --- |
+| Task 1 / Step 1 | 已完成 | 已补充 14→15 迁移和旧 Provider 保留 API Key 的失败测试。 |
+| Task 1 / Step 2 | 已完成 | RED 证据为 `no such column: auth_mode`，已记录于 Task 1 报告。 |
+| Task 1 / Step 3 | 已完成 | `CODEX_OAUTH`、`authMode`、Room 15 和 `MIGRATION_14_15` 已整合。 |
+| Task 1 / Step 4 | 已完成 | 迁移与 Repository 定向测试通过，独立审查 APPROVED。 |
+| Task 1 / Step 5 | 已完成 | Provider 认证类型与测试隔离检查点已提交并整合，独立复审 APPROVED。 |
+| Task 2 / Step 1 | 已完成 | MockWebServer / fake Call 测试已覆盖三阶段、异常输入和取消。 |
+| Task 2 / Step 2 | 已完成 | 缺失协议类型时的 RED 编译失败已记录。 |
+| Task 2 / Step 3 | 已完成 | 三个单次 HTTP 操作、固定 HTTPS 端点和取消边界已实现。 |
+| Task 2 / Step 4 | 已完成 | `CodexDeviceAuthClientTest` 12/12 通过，独立复审 APPROVED。 |
+| Task 2 / Step 5 | 已完成 | 设备码协议与协议加固检查点已提交并整合，独立复审 APPROVED。 |
+| Task 3 / Step 1 | 已完成 | JVM 测试已覆盖 round trip、随机密文、AAD 隔离、篡改清理和脱敏。 |
+| Task 3 / Step 2 | 已完成 | 仓库类型尚不存在时的 RED 编译失败已记录。 |
+| Task 3 / Step 3 | 已完成 | AndroidKeyStore AES/GCM、随机 IV、128-bit tag 和 provider AAD 已实现。 |
+| Task 3 / Step 4 | 已完成 | 真实 AndroidKeyStore instrumentation 测试源码已增加，已编译并打包测试 APK。 |
+| Task 3 / Step 5 | 部分完成 | JVM 定向测试 8/8 通过；无连接设备，`connectedDebugAndroidTest` 未运行，真实 AndroidKeyStore 行为尚待验证。 |
+| Task 3 / Step 6 | 已完成 | 加密凭据与清理加固检查点已提交并整合，独立安全复审 APPROVED。 |
+| Task 4 / Step 1 | 进行中 | Task 4 已启动；尚无完成报告或可勾选证据。 |
+| Task 4 / Step 2 | 未开始 | 待 Step 1 的失败测试就绪后执行。 |
+| Task 4 / Step 3 | 未开始 | 待实现状态机和 single-flight。 |
+| Task 4 / Step 4 | 未开始 | 待运行 Manager 定向测试。 |
+| Task 4 / Step 5 | 未开始 | 待完成并提交独立检查点。 |
+| Task 5 / Step 1 | 已完成 | 已增加 Runtime 配置验证与 Wire 脱敏失败测试；Factory 分流已调整至 Task 6。 |
+| Task 5 / Step 2 | 已完成 | RED 证据包括缺少 `authMode` 以及 Wire 误传 OAuth API Key。 |
+| Task 5 / Step 3 | 已完成 | `ModelConfig` 条件验证、Runtime 投影和 Binder 二次清空已实现。 |
+| Task 5 / Step 4 | 已完成 | Runtime/Wire 定向测试 26/26 通过，旧 API Key 定向回归通过。 |
+| Task 5 / Step 5 | 已完成 | Runtime 安全传输检查点已提交并整合，独立审查 APPROVED。 |
+| Task 6 / Step 1 | 未开始 | 待编写 Factory 分流、Codex Responses 契约和 MockWebServer 失败测试。 |
+| Task 6 / Step 2 | 未开始 | 待编写 SSE 和认证错误失败测试。 |
+| Task 6 / Step 3 | 未开始 | 待运行 Task 6 定向测试并确认 RED。 |
+| Task 6 / Step 4 | 未开始 | 待实现 Codex Provider、最小共享解析器与 Factory 分流。 |
+| Task 6 / Step 5 | 未开始 | 待运行 Codex/API Key Responses 和 Factory 定向测试。 |
+| Task 6 / Step 6 | 未开始 | 待完成并提交独立检查点。 |
+| Task 7 / Step 1 | 未开始 | 待编写 Compose 状态测试。 |
+| Task 7 / Step 2 | 未开始 | 待运行 UI 定向测试并确认 RED。 |
+| Task 7 / Step 3 | 未开始 | 待实现状态 UI 和系统浏览器 Intent。 |
+| Task 7 / Step 4 | 未开始 | 待运行 UI 定向测试。 |
+| Task 7 / Step 5 | 未开始 | 待完成并提交独立检查点。 |
+| Task 8 / Step 1 | 未开始 | 待所有实现任务完成后增加开关及关闭行为测试。 |
+| Task 8 / Step 2 | 未开始 | 待功能完成后按实际行为更新用户文档。 |
+| Task 8 / Step 3 | 未开始 | 待运行格式检查和完整单元测试。 |
+| Task 8 / Step 4 | 未开始 | 待构建 Debug APK。 |
+| Task 8 / Step 5 | 未开始 | 待提交文档和自动回归检查点。 |
+| Task 9 / Step 1 | 待人工 | 待 Tasks 1–8 门禁通过后，由人工安装 APK 检查认证界面。 |
+| Task 9 / Step 2 | 待人工 | 需在系统浏览器中完成一次真实设备码授权。 |
+| Task 9 / Step 3 | 待人工 | 需明确同意后消耗最少量 Codex 共享额度验证多轮 Agent。 |
+| Task 9 / Step 4 | 待人工 | 需在真实设备上验证进程重启后的凭据恢复。 |
+| Task 9 / Step 5 | 待人工 | 需人工确认原 API Key 界面和配置未受影响。 |
+| Task 9 / Step 6 | 待人工 | 需注销并以只计数、不输出匹配行的方式检查敏感日志。 |
+| Task 9 / Step 7 | 待人工 | 需记录脱敏验收结果，任一关键项失败则阻止发布。 |
+
+> 注：完整 JVM 基线目前有 8 个非 OAuth 失败；其中 6 个已确认为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个为既存失败但仍待单独诊断。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
+
 ---
 
 ## 文件结构
@@ -59,7 +117,7 @@
 - Produces: `ProviderAuthModes.CODEX_OAUTH`、`ProviderSetting.authMode: String = ""`。
 - Produces: Room 版本 15 和 `MIGRATION_14_15`。
 
-- [ ] **Step 1: 写失败测试，证明旧数据库迁移后保持 API Key 行为**
+- [x] **Step 1: 写失败测试，证明旧数据库迁移后保持 API Key 行为**
 
 ```kotlin
 assertEquals(15, FuckAndesDatabase::class.java.getAnnotation(Database::class.java).version)
@@ -67,13 +125,13 @@ assertEquals("", migratedProvider.getString(authModeColumn))
 assertEquals("sk-existing", migratedProvider.getString(apiKeyColumn))
 ```
 
-- [ ] **Step 2: 运行迁移与 Repository 测试并确认失败**
+- [x] **Step 2: 运行迁移与 Repository 测试并确认失败**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*FuckAndesDatabaseMigrationTest' --tests '*ProviderRepositoryTest'`
 
 Expected: FAIL，原因是数据库仍为 14 或不存在 `auth_mode`。
 
-- [ ] **Step 3: 增加认证常量、字段和迁移**
+- [x] **Step 3: 增加认证常量、字段和迁移**
 
 ```kotlin
 internal object ProviderAuthModes {
@@ -88,17 +146,17 @@ ALTER TABLE model_providers
 ADD COLUMN auth_mode TEXT NOT NULL DEFAULT ''
 ```
 
-- [ ] **Step 4: 运行测试并确认通过**
+- [x] **Step 4: 运行测试并确认通过**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*FuckAndesDatabaseMigrationTest' --tests '*ProviderRepositoryTest'`
 
 Expected: PASS；既有 Provider 的 API Key 和模型未变化。
 
-- [ ] **Step 5: 提交独立检查点**
+- [x] **Step 5: 提交独立检查点**
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/data/model/Provider.kt app/src/main/kotlin/fuck/andes/data/db/ProviderEntities.kt app/src/main/kotlin/fuck/andes/data/db/FuckAndesDatabase.kt app/src/test/java/fuck/andes/data/db/FuckAndesDatabaseMigrationTest.kt app/src/test/java/fuck/andes/data/repository/ProviderRepositoryTest.kt
-git commit -m "feat(provider): add Codex OAuth auth type"
+git commit -m "feat(provider): 新增 Codex OAuth 认证类型"
 ```
 
 ### Task 2: 设备码协议 Client
@@ -112,7 +170,7 @@ git commit -m "feat(provider): add Codex OAuth auth type"
 - Produces: `CodexDeviceAuthProtocol.requestAuthorization()`、`pollOnce()`、`exchangeToken()`。
 - Produces: `CodexDeviceAuthorization`、`CodexAuthorizationCode`、`CodexTokenSet` 和不含响应正文的错误枚举。
 
-- [ ] **Step 1: 使用 MockWebServer 写三个阶段的失败测试**
+- [x] **Step 1: 使用 MockWebServer 写三个阶段的失败测试**
 
 覆盖：初始 JSON、403/404 pending、授权成功、token exchange、缺字段、非 JSON、取消 Call。断言初始请求只发送公开 client ID：
 
@@ -121,13 +179,13 @@ assertEquals("app_EMoamEEZ73f0CkXaXp7hrann", requestJson.getString("client_id"))
 assertEquals("/api/accounts/deviceauth/usercode", request.path)
 ```
 
-- [ ] **Step 2: 运行定向测试并确认失败**
+- [x] **Step 2: 运行定向测试并确认失败**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexDeviceAuthClientTest'`
 
 Expected: FAIL，设备码类型和 Client 尚不存在。
 
-- [ ] **Step 3: 实现单次操作边界**
+- [x] **Step 3: 实现单次操作边界**
 
 ```kotlin
 internal interface CodexDeviceAuthProtocol {
@@ -139,17 +197,17 @@ internal interface CodexDeviceAuthProtocol {
 
 生产端点固定为 `auth.openai.com`；每个方法只执行一次 HTTP 操作，循环、延迟、浏览器和存储均不放入 Client。
 
-- [ ] **Step 4: 运行协议测试并确认通过**
+- [x] **Step 4: 运行协议测试并确认通过**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexDeviceAuthClientTest'`
 
 Expected: PASS；测试网络请求全部指向 MockWebServer。
 
-- [ ] **Step 5: 提交独立检查点**
+- [x] **Step 5: 提交独立检查点**
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/data/auth/CodexDeviceAuthModels.kt app/src/main/kotlin/fuck/andes/data/auth/CodexDeviceAuthClient.kt app/src/test/java/fuck/andes/data/auth/CodexDeviceAuthClientTest.kt
-git commit -m "feat(auth): add Codex device authorization protocol"
+git commit -m "feat(auth): 新增 Codex 设备码授权协议"
 ```
 
 ### Task 3: Keystore 加密凭据仓库
@@ -163,17 +221,17 @@ git commit -m "feat(auth): add Codex device authorization protocol"
 - Produces: `CodexOAuthCredential`。
 - Produces: `CodexCredentialStore.load(providerId)`、`save(providerId, credential)`、`clear(providerId)`。
 
-- [ ] **Step 1: 写凭据 round trip 和安全属性测试**
+- [x] **Step 1: 写凭据 round trip 和安全属性测试**
 
 断言相同明文连续保存产生不同密文、错误 provider ID 无法解密、篡改密文后返回空并清理、序列化和 `toString()` 不出现 token。
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexCredentialStoreTest'`
 
 Expected: FAIL，凭据仓库尚不存在。
 
-- [ ] **Step 3: 实现 AndroidKeyStore AES/GCM 存储**
+- [x] **Step 3: 实现 AndroidKeyStore AES/GCM 存储**
 
 ```kotlin
 internal interface CodexCredentialStore {
@@ -185,7 +243,7 @@ internal interface CodexCredentialStore {
 
 使用 alias `eta_codex_oauth_v1`、随机 12-byte IV、128-bit GCM tag，并用 `packageName|providerId|v1` 作为 AAD。测试使用注入式 `SecretKeyProvider`，不依赖真实设备 KeyStore。
 
-- [ ] **Step 4: 增加 AndroidKeyStore 自动化设备测试**
+- [x] **Step 4: 增加 AndroidKeyStore 自动化设备测试**
 
 在 instrumentation test 中使用真实 `AndroidKeyStore` 完成保存、进程内重新加载、篡改密文 fail-closed 和注销清理；测试只使用固定的合成 token，禁止真实 OAuth 凭据。
 
@@ -199,11 +257,11 @@ Run: `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunn
 
 Expected: PASS；真实 AndroidKeyStore round trip、密文损坏和注销清理均通过。
 
-- [ ] **Step 6: 提交独立检查点**
+- [x] **Step 6: 提交独立检查点**
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/data/auth/CodexCredentialStore.kt app/src/test/java/fuck/andes/data/auth/CodexCredentialStoreTest.kt app/src/androidTest/java/fuck/andes/data/auth/CodexCredentialStoreInstrumentedTest.kt
-git commit -m "feat(auth): encrypt Codex OAuth credentials"
+git commit -m "feat(auth): 加密存储 Codex OAuth 凭据"
 ```
 
 ### Task 4: 登录协调与 Token 刷新
@@ -251,70 +309,71 @@ Expected: PASS；并发刷新计数严格为 1。
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/data/auth/CodexOAuthManager.kt app/src/test/java/fuck/andes/data/auth/CodexOAuthManagerTest.kt app/src/main/kotlin/fuck/andes/FuckAndesApp.kt
-git commit -m "feat(auth): manage Codex device login lifecycle"
+git commit -m "feat(auth): 管理 Codex 设备码登录生命周期"
 ```
 
-### Task 5: Runtime 配置与 Provider 分流
+### Task 5: Runtime 配置与安全传输
 
 **Files:**
 - Modify: `app/src/main/kotlin/fuck/andes/data/repository/RuntimeConfigRepository.kt`
 - Modify: `app/src/main/kotlin/fuck/andes/agent/model/AgentModelClient.kt`
-- Modify: `app/src/main/kotlin/fuck/andes/agent/model/ProviderClientFactory.kt`
 - Modify: `app/src/main/kotlin/fuck/andes/agent/runtime/AgentRuntimeWire.kt`
 - Modify: `app/src/test/java/fuck/andes/data/repository/RuntimeConfigRepositoryTest.kt`
 - Modify: `app/src/test/java/fuck/andes/agent/runtime/AgentRuntimeWireTest.kt`
-- Create: `app/src/test/java/fuck/andes/agent/model/ProviderClientFactoryTest.kt`
 
 **Interfaces:**
 - Produces: `ModelConfig.authMode`，默认空字符串；只有新能力使用 `codex_oauth`。
 - Consumes: `providerId` 作为 OAuth credential lookup key。
 
-- [ ] **Step 1: 写配置验证和 Factory 分流失败测试**
+- [x] **Step 1: 写配置验证和 Runtime Wire 安全传输失败测试**
 
 ```kotlin
 assertDoesNotThrow { codexConfig.copy(apiKey = "").validateForTest() }
-assertSame(CodexResponsesProvider, ProviderClientFactory.getClient(codexConfig))
-assertSame(OpenAiResponsesProvider, ProviderClientFactory.getClient(apiKeyConfig))
 ```
 
 同时断言 `AgentRuntimeWire` round trip 只携带 `authMode`，序列化内容不包含 OAuth token 字段。
 
-- [ ] **Step 2: 运行定向测试并确认失败**
+- [x] **Step 2: 运行定向测试并确认失败**
 
-Run: `./gradlew :app:testDebugUnitTest --tests '*RuntimeConfigRepositoryTest' --tests '*AgentRuntimeWireTest' --tests '*ProviderClientFactoryTest'`
+Run: `./gradlew :app:testDebugUnitTest --tests '*RuntimeConfigRepositoryTest' --tests '*AgentRuntimeWireTest'`
 
-Expected: FAIL，`authMode` 和 Codex 分流尚不存在。
+Expected: FAIL，`authMode` 和对应 Runtime Wire schema 尚不存在。
 
-- [ ] **Step 3: 实现条件验证和分流**
+- [x] **Step 3: 实现条件验证和安全传输**
 
-`ModelConfig.validate()` 规则改为：`authMode` 为空时完整保留当前非空 `apiKey` 校验；Codex OAuth 模式要求内置 OpenAI、Responses endpoint 和非空 provider ID，但不要求 API Key。
+`ModelConfig.validate()` 规则改为：`authMode` 为空时完整保留当前非空 `apiKey` 校验；Codex OAuth 模式要求内置 OpenAI、Responses endpoint 和非空 provider ID，但不要求 API Key。Runtime 投影和 Binder Wire 只传递 `authMode + providerId`，并在 OAuth 模式强制清空 `apiKey`。
 
-- [ ] **Step 4: 运行定向测试并确认通过**
+- [x] **Step 4: 运行定向测试并确认通过**
 
-Run: `./gradlew :app:testDebugUnitTest --tests '*RuntimeConfigRepositoryTest' --tests '*AgentRuntimeWireTest' --tests '*ProviderClientFactoryTest'`
+Run: `./gradlew :app:testDebugUnitTest --tests '*RuntimeConfigRepositoryTest' --tests '*AgentRuntimeWireTest'`
 
 Expected: PASS；现有 API Key 校验测试仍通过。
 
-- [ ] **Step 5: 提交独立检查点**
+- [x] **Step 5: 提交独立检查点**
 
 ```bash
-git add app/src/main/kotlin/fuck/andes/data/repository/RuntimeConfigRepository.kt app/src/main/kotlin/fuck/andes/agent/model/AgentModelClient.kt app/src/main/kotlin/fuck/andes/agent/model/ProviderClientFactory.kt app/src/main/kotlin/fuck/andes/agent/runtime/AgentRuntimeWire.kt app/src/test/java/fuck/andes/data/repository/RuntimeConfigRepositoryTest.kt app/src/test/java/fuck/andes/agent/runtime/AgentRuntimeWireTest.kt app/src/test/java/fuck/andes/agent/model/ProviderClientFactoryTest.kt
-git commit -m "feat(agent): route Codex OAuth provider configs"
+git add app/src/main/kotlin/fuck/andes/data/repository/RuntimeConfigRepository.kt app/src/main/kotlin/fuck/andes/agent/model/AgentModelClient.kt app/src/main/kotlin/fuck/andes/agent/runtime/AgentRuntimeWire.kt app/src/test/java/fuck/andes/data/repository/RuntimeConfigRepositoryTest.kt app/src/test/java/fuck/andes/agent/runtime/AgentRuntimeWireTest.kt
+git commit -m "feat(agent): 安全传输 Codex OAuth Provider 配置"
 ```
 
 ### Task 6: Codex Responses Provider
 
 **Files:**
 - Create: `app/src/main/kotlin/fuck/andes/agent/model/CodexResponsesProvider.kt`
+- Modify: `app/src/main/kotlin/fuck/andes/agent/model/ProviderClientFactory.kt`
 - Modify: `app/src/main/kotlin/fuck/andes/agent/model/ResponsesRequestBuilder.kt`
 - Create: `app/src/test/java/fuck/andes/agent/model/CodexResponsesProviderTest.kt`
+- Create: `app/src/test/java/fuck/andes/agent/model/ProviderClientFactoryTest.kt`
 - Modify: `app/src/test/java/fuck/andes/agent/model/OpenAiResponsesProviderTest.kt`
 
 **Interfaces:**
 - Consumes: `CodexCredentialProvider.requireValidCredential(providerId)`。
 - Produces: `AgentProviderClient` ID `codex_oauth_responses`。
+- Produces: `ProviderClientFactory` 按已验证的 `authMode` 分流：Codex OAuth 选择新 Provider，空模式仍选择原 API Key Provider。
 
-- [ ] **Step 1: 写 MockWebServer 契约失败测试**
+- [ ] **Step 1: 写 Factory 分流与 MockWebServer 契约失败测试**
+
+先用 `ProviderClientFactoryTest` 断言 Codex OAuth 配置选择 `CodexResponsesProvider`，空 `authMode` 的 API Key 配置仍选择 `OpenAiResponsesProvider`，OAuth 失败时不得回退。
 
 断言固定路径 `/backend-api/codex/responses`、bare `application/json`、bearer、`Originator`、Account ID、`stream=true`、`store=false`、完整历史、函数调用和函数结果。断言自定义 Base URL 与 Authorization Header 无法覆盖固定值。
 
@@ -324,25 +383,25 @@ git commit -m "feat(agent): route Codex OAuth provider configs"
 
 - [ ] **Step 3: 运行定向测试并确认失败**
 
-Run: `./gradlew :app:testDebugUnitTest --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest'`
+Run: `./gradlew :app:testDebugUnitTest --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest' --tests '*ProviderClientFactoryTest'`
 
-Expected: FAIL，Codex Provider 尚不存在。
+Expected: FAIL，Codex Provider 和 Factory 分流尚不存在。
 
 - [ ] **Step 4: 实现独立 Provider 并抽取最小共享解析器**
 
-只从 `OpenAiResponsesProvider` 抽取无认证、无端点知识的 SSE 解析函数；API Key 请求构建保持原样。Codex 特殊字段由 `CodexResponsesProvider` 最终写入，用户自定义 body 不能覆盖 `model`、`input`、`tools`、`stream`、`store` 或 reasoning continuity 字段。
+只从 `OpenAiResponsesProvider` 抽取无认证、无端点知识的 SSE 解析函数；API Key 请求构建保持原样。Codex 特殊字段由 `CodexResponsesProvider` 最终写入，用户自定义 body 不能覆盖 `model`、`input`、`tools`、`stream`、`store` 或 reasoning continuity 字段。`ProviderClientFactory` 只根据已验证的 `authMode` 选择 Provider，不将凭据回填到 `ModelConfig`。
 
 - [ ] **Step 5: 运行定向测试并确认通过**
 
-Run: `./gradlew :app:testDebugUnitTest --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest'`
+Run: `./gradlew :app:testDebugUnitTest --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest' --tests '*ProviderClientFactoryTest'`
 
-Expected: PASS；API Key Responses 请求快照不变。
+Expected: PASS；API Key Responses 请求快照不变，空认证模式分流不变。
 
 - [ ] **Step 6: 提交独立检查点**
 
 ```bash
-git add app/src/main/kotlin/fuck/andes/agent/model/CodexResponsesProvider.kt app/src/main/kotlin/fuck/andes/agent/model/ResponsesRequestBuilder.kt app/src/test/java/fuck/andes/agent/model/CodexResponsesProviderTest.kt app/src/test/java/fuck/andes/agent/model/OpenAiResponsesProviderTest.kt
-git commit -m "feat(provider): call Codex Responses with OAuth"
+git add app/src/main/kotlin/fuck/andes/agent/model/CodexResponsesProvider.kt app/src/main/kotlin/fuck/andes/agent/model/ProviderClientFactory.kt app/src/main/kotlin/fuck/andes/agent/model/ResponsesRequestBuilder.kt app/src/test/java/fuck/andes/agent/model/CodexResponsesProviderTest.kt app/src/test/java/fuck/andes/agent/model/ProviderClientFactoryTest.kt app/src/test/java/fuck/andes/agent/model/OpenAiResponsesProviderTest.kt
+git commit -m "feat(provider): 使用 OAuth 调用 Codex Responses"
 ```
 
 ### Task 7: Provider 设置页设备码 UI
@@ -388,7 +447,7 @@ Expected: PASS；取消会停止轮询，退出只清除 OAuth 凭据。
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/ui/pages/providers/CodexDeviceLoginContent.kt app/src/main/kotlin/fuck/andes/ui/pages/providers/CodexVerificationPageLauncher.kt app/src/main/kotlin/fuck/andes/ui/pages/providers/ModelProviderDetailScreen.kt app/src/test/java/fuck/andes/ui/pages/providers/CodexDeviceLoginContentTest.kt
-git commit -m "feat(ui): add Codex device-code login"
+git commit -m "feat(ui): 新增 Codex 设备码登录界面"
 ```
 
 ### Task 8: 功能开关、文档和自动回归
@@ -433,7 +492,7 @@ Expected: BUILD SUCCESSFUL，生成可安装 Debug APK。
 
 ```bash
 git add app/build.gradle.kts README.md docs/README.md docs/README_EN.md docs/AGENT_RUNTIME.md downstream
-git commit -m "docs(auth): document Codex OAuth device login"
+git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 ```
 
 ### Task 9: 最终人工验收（唯一允许真实 Codex 账号和额度的任务）

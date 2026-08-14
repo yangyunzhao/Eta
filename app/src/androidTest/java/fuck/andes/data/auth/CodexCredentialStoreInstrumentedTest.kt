@@ -1,6 +1,7 @@
 package fuck.andes.data.auth
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Base64
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,17 +18,19 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class CodexCredentialStoreInstrumentedTest {
     private lateinit var context: Context
+    private lateinit var preferences: SharedPreferences
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        credentialPreferences().edit().clear().commit()
+        preferences = context.getSharedPreferences(TEST_PREFERENCES_NAME, Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
         deleteTestKey()
     }
 
     @After
     fun tearDown() {
-        credentialPreferences().edit().clear().commit()
+        preferences.edit().clear().commit()
         deleteTestKey()
     }
 
@@ -39,33 +42,28 @@ class CodexCredentialStoreInstrumentedTest {
 
         newStore().clear(PROVIDER_ID)
         assertNull(newStore().load(PROVIDER_ID))
-        assertTrue(credentialPreferences().all.isEmpty())
+        assertTrue(preferences.all.isEmpty())
     }
 
     @Test
     fun tamperedCiphertextFailsClosedAndIsDeleted() {
         newStore().save(PROVIDER_ID, CREDENTIAL)
-        val entry = credentialPreferences().all.entries.single()
+        val entry = preferences.all.entries.single()
         val envelope = Base64.decode(entry.value as String, Base64.NO_WRAP)
         envelope[envelope.lastIndex] = (envelope.last().toInt() xor 0x01).toByte()
-        credentialPreferences().edit()
+        preferences.edit()
             .putString(entry.key, Base64.encodeToString(envelope, Base64.NO_WRAP))
             .commit()
 
         assertNull(newStore().load(PROVIDER_ID))
-        assertFalse(credentialPreferences().contains(entry.key))
+        assertFalse(preferences.contains(entry.key))
     }
 
     private fun newStore(): AndroidCodexCredentialStore =
         AndroidCodexCredentialStore(
-            context = context,
+            packageName = context.packageName,
+            preferences = preferences,
             secretKeyProvider = AndroidKeyStoreSecretKeyProvider(TEST_KEY_ALIAS),
-        )
-
-    private fun credentialPreferences() =
-        context.getSharedPreferences(
-            AndroidCodexCredentialStore.PREFERENCES_NAME,
-            Context.MODE_PRIVATE,
         )
 
     private fun deleteTestKey() {
@@ -74,6 +72,7 @@ class CodexCredentialStoreInstrumentedTest {
 
     private companion object {
         const val TEST_KEY_ALIAS = "eta_codex_oauth_v1_instrumented_test"
+        const val TEST_PREFERENCES_NAME = "eta_codex_oauth_credentials_v1_instrumented_test"
         const val PROVIDER_ID = "instrumented-provider"
 
         val CREDENTIAL = CodexOAuthCredential(
