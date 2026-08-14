@@ -123,6 +123,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.json)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.room.testing)
     testImplementation(libs.robolectric)
 }
