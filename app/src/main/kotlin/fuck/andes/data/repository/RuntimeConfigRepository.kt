@@ -87,10 +87,15 @@ internal object RuntimeConfigRepository {
             ?.takeIf { it.isNotBlank() }
             ?: BuiltinProviders.DEFAULT_SYSTEM_PROMPT
         val sourceType = ProviderSourceRegistry.resolve(provider)
-        val endpointMode = when (provider) {
+        val storedEndpointMode = when (provider) {
             is OpenAiCompatibleProviderSetting -> provider.endpointMode
             is CustomProviderSetting -> provider.endpointMode
             is AnthropicProviderSetting -> ""
+        }
+        val endpointMode = if (provider.authMode == ProviderAuthModes.CODEX_OAUTH) {
+            OpenAiEndpointMode.RESPONSES
+        } else {
+            storedEndpointMode
         }
         val inferOpenAiCatalog = sourceType == fuck.andes.data.model.ProviderSourceTypes.CUSTOM &&
             endpointMode == OpenAiEndpointMode.RESPONSES

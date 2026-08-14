@@ -121,6 +121,23 @@ class CodexOAuthManagerTest {
     }
 
     @Test
+    fun `provider scoped state flow emits idle after recovered credential is logged out`() {
+        val store = InMemoryCredentialStore().apply { save(PROVIDER_ID, OLD_CREDENTIAL) }
+        val manager = manager(store = store)
+        val state = manager.loginStateFlowFor(PROVIDER_ID)
+
+        assertEquals(CodexLoginState.Authorized(null), state.value)
+
+        manager.logout(PROVIDER_ID)
+
+        repeat(1_000) {
+            if (state.value == CodexLoginState.Idle) return
+            Thread.sleep(5)
+        }
+        error("Timed out waiting for provider scoped logout state; current=${state.value}")
+    }
+
+    @Test
     fun `provider scoped cancel cannot cancel another provider login`() {
         val manager = manager(
             protocol = FakeDeviceProtocol(pollResults = ArrayDeque(listOf(CodexDevicePollResult.Pending))),

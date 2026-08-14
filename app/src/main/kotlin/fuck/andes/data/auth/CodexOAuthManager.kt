@@ -20,8 +20,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.HttpUrl
@@ -225,6 +229,8 @@ internal class CodexOAuthManager(
 ) {
     private val mutableLoginState = MutableStateFlow<CodexLoginState>(CodexLoginState.Idle)
     val loginState: StateFlow<CodexLoginState> = mutableLoginState.asStateFlow()
+    private val credentialStateRevision = MutableStateFlow(0L)
+    private val providerLoginStateFlows = ConcurrentHashMap<String, StateFlow<CodexLoginState>>()
 
     private val loginLock = Any()
     private val beginLoginLock = Any()
@@ -314,6 +320,19 @@ internal class CodexOAuthManager(
         }
     }
 
+    fun loginStateFlowFor(providerId: String): StateFlow<CodexLoginState> {
+        validateProviderId(providerId)
+        return providerLoginStateFlows.computeIfAbsent(providerId) {
+            combine(mutableLoginState, credentialStateRevision) { _, _ ->
+                loginStateFor(providerId)
+            }.stateIn(
+                scope = scope,
+                started = SharingStarted.Eagerly,
+                initialValue = loginStateFor(providerId),
+            )
+        }
+    }
+
     suspend fun requireValidCredential(providerId: String): CodexOAuthCredential {
         validateProviderId(providerId)
         val observed = loadCredentialSnapshot(providerId).credential
@@ -382,6 +401,7 @@ internal class CodexOAuthManager(
                     }
                     providerEpoch(providerId).incrementAndGet()
                     recentRefreshes.remove(providerId)
+                    publishCredentialMutation()
                     publishCredentialFailure(CodexAuthFailure.REAUTHENTICATION_REQUIRED)
                     true
                 }
@@ -400,6 +420,7 @@ internal class CodexOAuthManager(
             }
             providerEpoch(providerId).incrementAndGet()
             recentRefreshes.remove(providerId)
+            publishCredentialMutation()
         }
         if (!cancelledLogin) {
             synchronized(loginLock) {
@@ -517,6 +538,7 @@ internal class CodexOAuthManager(
                         }
                         providerEpoch(session.providerId).incrementAndGet()
                         recentRefreshes.remove(session.providerId)
+                        publishCredentialMutation()
                         mutableLoginState.value = CodexLoginState.Authorized(accountLabel = null)
                     }
                 }
@@ -556,6 +578,7 @@ internal class CodexOAuthManager(
                     accessToken = updated.accessToken,
                     refreshedAtEpochMillis = nowEpochMillis(),
                 )
+                publishCredentialMutation()
             }
             updated
         }
@@ -573,6 +596,7 @@ internal class CodexOAuthManager(
                     }
                     providerEpoch(providerId).incrementAndGet()
                     recentRefreshes.remove(providerId)
+                    publishCredentialMutation()
                 }
                 publishCredentialFailure(CodexAuthFailure.REAUTHENTICATION_REQUIRED)
                 throw CodexAuthException(CodexAuthFailure.REAUTHENTICATION_REQUIRED)
@@ -643,6 +667,7 @@ internal class CodexOAuthManager(
             }
             providerEpoch(session.providerId).incrementAndGet()
             recentRefreshes.remove(session.providerId)
+            publishCredentialMutation()
         }
         session.previousCredential = null
         session.committedCredential = null
@@ -669,6 +694,12 @@ internal class CodexOAuthManager(
     private fun publishCredentialFailure(failure: CodexAuthFailure) {
         synchronized(loginLock) {
             if (loginProviderId == null) mutableLoginState.value = CodexLoginState.Failed(failure)
+        }
+    }
+
+    private fun publishCredentialMutation() {
+        credentialStateRevision.update { revision ->
+            if (revision == Long.MAX_VALUE) 0L else revision + 1L
         }
     }
 

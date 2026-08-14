@@ -55,11 +55,11 @@
 | Task 6 / Step 4 | 已完成 | 已加固账号 Header、流内取消、二次 401 CAS、固定生产 trust domain 和 429 安全分类。 |
 | Task 6 / Step 5 | 已完成 | 强制 fresh Codex 10、API Key Responses 6、Factory 4，共 20/20 通过；独立复审 APPROVED。 |
 | Task 6 / Step 6 | 已完成 | 独立复审 APPROVED，Codex Responses 与 Factory 接入已用中文提交为独立检查点。 |
-| Task 7 / Step 1 | 未开始 | 待编写 Compose 状态测试。 |
-| Task 7 / Step 2 | 未开始 | 待运行 UI 定向测试并确认 RED。 |
-| Task 7 / Step 3 | 未开始 | 待实现状态 UI 和系统浏览器 Intent。 |
-| Task 7 / Step 4 | 未开始 | 待运行 UI 定向测试。 |
-| Task 7 / Step 5 | 未开始 | 待完成并提交独立检查点。 |
+| Task 7 / Step 1 | 已完成 | 已新增 Compose/Robolectric 测试，覆盖认证字段、登录状态、UI 动作、脱敏和固定浏览器 Intent。 |
+| Task 7 / Step 2 | 已完成 | 定向测试仅因 launcher 与认证 UI 尚不存在而按预期 RED，Compose 测试依赖已正常解析。 |
+| Task 7 / Step 3 | 已完成 | 已实现 Provider 级状态刷新、认证模式规范化和不改写持久配置的 OAuth Responses 运行时派生。 |
+| Task 7 / Step 4 | 已完成 | 强制 fresh UI/Manager/Runtime/Repository/API Key 六类 58/58 通过；独立复审 APPROVED。 |
+| Task 7 / Step 5 | 已完成 | 独立复审 APPROVED，设备码登录 UI 已用中文提交为独立检查点。 |
 | Task 8 / Step 1 | 未开始 | 待所有实现任务完成后增加开关及关闭行为测试。 |
 | Task 8 / Step 2 | 未开始 | 待功能完成后按实际行为更新用户文档。 |
 | Task 8 / Step 3 | 未开始 | 待运行格式检查和完整单元测试。 |
@@ -417,17 +417,17 @@ git commit -m "feat(provider): 使用 OAuth 调用 Codex Responses"
 - Produces: 认证方式选择与设备码状态卡片。
 - Produces: `CodexVerificationPageLauncher.open(): Boolean`，生产实现只发出固定 HTTPS `ACTION_VIEW` Intent。
 
-- [ ] **Step 1: 写 Compose 状态测试**
+- [x] **Step 1: 写 Compose 状态测试**
 
 断言 API Key 模式继续显示原输入框；Codex 模式隐藏 API Key/Base URL 编辑，展示设备码登录。等待状态包含验证码、复制、浏览器和取消按钮；点击浏览器按钮时，注入的 launcher 只收到 `https://auth.openai.com/codex/device`；已登录状态包含退出按钮；语义树不包含 token。
 
-- [ ] **Step 2: 运行 UI 定向测试并确认失败**
+- [x] **Step 2: 运行 UI 定向测试并确认失败**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexDeviceLoginContentTest'`
 
 Expected: FAIL，设备码 UI 尚不存在。
 
-- [ ] **Step 3: 实现状态 UI 和系统浏览器 Intent**
+- [x] **Step 3: 实现状态 UI 和系统浏览器 Intent**
 
 ```kotlin
 internal fun interface CodexVerificationPageLauncher {
@@ -437,13 +437,13 @@ internal fun interface CodexVerificationPageLauncher {
 
 生产实现只用 `Intent.ACTION_VIEW` 打开 `https://auth.openai.com/codex/device`；测试注入 recording launcher，不启动真实浏览器。Manifest 不增加 intent-filter、deep link 或回调 Activity。旋转后从 Manager 的 StateFlow 恢复等待状态。
 
-- [ ] **Step 4: 运行 UI 测试并确认通过**
+- [x] **Step 4: 运行 UI 测试并确认通过**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexDeviceLoginContentTest'`
 
 Expected: PASS；取消会停止轮询，退出只清除 OAuth 凭据。
 
-- [ ] **Step 5: 提交独立检查点**
+- [x] **Step 5: 提交独立检查点**
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/ui/pages/providers/CodexDeviceLoginContent.kt app/src/main/kotlin/fuck/andes/ui/pages/providers/CodexVerificationPageLauncher.kt app/src/main/kotlin/fuck/andes/ui/pages/providers/ModelProviderDetailScreen.kt app/src/test/java/fuck/andes/ui/pages/providers/CodexDeviceLoginContentTest.kt

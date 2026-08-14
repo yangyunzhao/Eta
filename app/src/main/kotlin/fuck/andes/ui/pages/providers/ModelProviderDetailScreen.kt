@@ -32,24 +32,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
 import fuck.andes.FuckAndesApp
+import fuck.andes.data.auth.CodexLoginState
 import fuck.andes.data.model.AnthropicProviderSetting
 import fuck.andes.data.model.CustomProviderSetting
 import fuck.andes.data.model.Model
 import fuck.andes.data.model.OpenAiCompatibleProviderSetting
 import fuck.andes.data.model.OpenAiEndpointMode
+import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.withId
 import fuck.andes.data.repository.ModelRepository
@@ -89,6 +90,7 @@ private data class ProviderConfigDraft(
     val name: String,
     val baseUrl: String,
     val apiKey: String,
+    val authMode: String,
     val systemPrompt: String,
     val isEnabled: Boolean,
     val endpointMode: String,
@@ -100,6 +102,7 @@ private data class ProviderConfigDraft(
             name = provider.name,
             baseUrl = provider.baseUrl,
             apiKey = provider.apiKey,
+            authMode = provider.authMode,
             systemPrompt = provider.systemPrompt.orEmpty(),
             isEnabled = provider.isEnabled,
             endpointMode = when (provider) {
@@ -216,6 +219,18 @@ private fun ProviderConfigTab(
     var showResetDialog by remember { mutableStateOf(false) }
     var isWorking by remember { mutableStateOf(false) }
     var creationCommitted by remember { mutableStateOf(false) }
+    val canUseCodexOAuth = supportsCodexOAuth(provider)
+    val codexMode = canUseCodexOAuth && draft.authMode == ProviderAuthModes.CODEX_OAUTH
+    val codexManager = if (canUseCodexOAuth) FuckAndesApp.requireCodexOAuthManager() else null
+    val codexLoginState = codexManager
+        ?.loginStateFlowFor(provider.id)
+        ?.collectAsState()
+        ?.value
+        ?: CodexLoginState.Idle
+    val context = LocalContext.current
+    val verificationPageLauncher = remember(context) {
+        AndroidCodexVerificationPageLauncher(context)
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -235,34 +250,31 @@ private fun ProviderConfigTab(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    TextField(
-                        value = draft.baseUrl,
-                        onValueChange = { onDraftChange(draft.copy(baseUrl = it)) },
-                        label = "Base URL",
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    TextField(
-                        value = draft.apiKey,
-                        onValueChange = { onDraftChange(draft.copy(apiKey = it)) },
-                        label = "API Key",
-                        singleLine = true,
-                        visualTransformation = if (apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { apiKeyVisible = !apiKeyVisible }) {
-                                Icon(
-                                    painter = painterResource(
-                                        if (apiKeyVisible) LucideR.drawable.lucide_ic_eye else LucideR.drawable.lucide_ic_eye_off,
-                                    ),
-                                    contentDescription = if (apiKeyVisible) "隐藏" else "显示",
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (provider is AnthropicProviderSetting) {
+                }
+                ProviderAuthenticationContent(
+                    supportsCodexOAuth = canUseCodexOAuth,
+                    authMode = draft.authMode,
+                    baseUrl = draft.baseUrl,
+                    apiKey = draft.apiKey,
+                    apiKeyVisible = apiKeyVisible,
+                    loginState = codexLoginState,
+                    launcher = verificationPageLauncher,
+                    onAuthModeChange = { authMode ->
+                        if (authMode.isEmpty()) codexManager?.cancelLogin(provider.id)
+                        onDraftChange(draft.copy(authMode = authMode))
+                    },
+                    onBaseUrlChange = { onDraftChange(draft.copy(baseUrl = it)) },
+                    onApiKeyChange = { onDraftChange(draft.copy(apiKey = it)) },
+                    onToggleApiKeyVisibility = { apiKeyVisible = !apiKeyVisible },
+                    onBeginLogin = { codexManager?.beginDeviceLogin(provider.id) },
+                    onCancelLogin = { codexManager?.cancelLogin(provider.id) },
+                    onLogout = {
+                        runCatching { codexManager?.logout(provider.id) }
+                            .onFailure { status = "退出失败：无法清除登录状态" }
+                    },
+                )
+                if (!codexMode && provider is AnthropicProviderSetting) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
                         Spacer(modifier = Modifier.height(12.dp))
                         TextField(
                             value = draft.anthropicVersion,
@@ -273,7 +285,7 @@ private fun ProviderConfigTab(
                         )
                     }
                 }
-                if (provider !is AnthropicProviderSetting) {
+                if (!codexMode && provider !is AnthropicProviderSetting) {
                     HorizontalDivider()
                     WindowSpinnerPreference(
                         items = listOf(
@@ -311,40 +323,43 @@ private fun ProviderConfigTab(
                         )
                     }
                 }
-                HorizontalDivider()
-                BasicComponent(
-                    title = "测试连接",
-                    summary = testStatus,
-                    enabled = !isWorking,
-                    onClick = {
-                        val validationError = validateProviderDraft(draft)
-                        if (validationError != null) {
-                            testStatus = "失败：$validationError"
-                            return@BasicComponent
-                        }
-                        scope.launch {
-                            isWorking = true
-                            testStatus = "测试中..."
-                            try {
-                                testStatus = testConnection(
-                                    buildUpdatedProvider(
-                                        source = provider,
-                                        name = draft.name,
-                                        baseUrl = draft.baseUrl,
-                                        apiKey = draft.apiKey,
-                                        systemPrompt = draft.systemPrompt,
-                                        isEnabled = draft.isEnabled,
-                                        endpointMode = draft.endpointMode,
-                                        hostedWebSearchEnabled = draft.hostedWebSearchEnabled,
-                                        anthropicVersion = draft.anthropicVersion,
-                                    )
-                                )
-                            } finally {
-                                isWorking = false
+                if (!codexMode) {
+                    HorizontalDivider()
+                    BasicComponent(
+                        title = "测试连接",
+                        summary = testStatus,
+                        enabled = !isWorking,
+                        onClick = {
+                            val validationError = validateProviderDraft(provider, draft)
+                            if (validationError != null) {
+                                testStatus = "失败：$validationError"
+                                return@BasicComponent
                             }
-                        }
-                    },
-                )
+                            scope.launch {
+                                isWorking = true
+                                testStatus = "测试中..."
+                                try {
+                                    testStatus = testConnection(
+                                        buildUpdatedProvider(
+                                            source = provider,
+                                            name = draft.name,
+                                            baseUrl = draft.baseUrl,
+                                            apiKey = draft.apiKey,
+                                            authMode = draft.authMode,
+                                            systemPrompt = draft.systemPrompt,
+                                            isEnabled = draft.isEnabled,
+                                            endpointMode = draft.endpointMode,
+                                            hostedWebSearchEnabled = draft.hostedWebSearchEnabled,
+                                            anthropicVersion = draft.anthropicVersion,
+                                        )
+                                    )
+                                } finally {
+                                    isWorking = false
+                                }
+                            }
+                        },
+                    )
+                }
             }
         }
 
@@ -396,7 +411,7 @@ private fun ProviderConfigTab(
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                     onClick = {
-                        val validationError = validateProviderDraft(draft)
+                        val validationError = validateProviderDraft(provider, draft)
                         if (validationError != null) {
                             status = "失败：$validationError"
                             return@TextButton
@@ -408,6 +423,7 @@ private fun ProviderConfigTab(
                                 name = draft.name,
                                 baseUrl = draft.baseUrl,
                                 apiKey = draft.apiKey,
+                                authMode = draft.authMode,
                                 systemPrompt = draft.systemPrompt,
                                 isEnabled = draft.isEnabled,
                                 endpointMode = draft.endpointMode,
@@ -1093,11 +1109,12 @@ private fun ModelEditDialog(
     }
 }
 
-private fun buildUpdatedProvider(
+internal fun buildUpdatedProvider(
     source: ProviderSetting,
     name: String,
     baseUrl: String,
     apiKey: String,
+    authMode: String,
     systemPrompt: String,
     isEnabled: Boolean,
     endpointMode: String,
@@ -1105,11 +1122,13 @@ private fun buildUpdatedProvider(
     anthropicVersion: String,
 ): ProviderSetting {
     val prompt = systemPrompt.trim().takeIf { it.isNotBlank() }
+    val effectiveAuthMode = effectiveProviderAuthMode(source, authMode)
     return when (source) {
         is OpenAiCompatibleProviderSetting -> source.copy(
             name = name.trim(),
             baseUrl = baseUrl.trim(),
             apiKey = apiKey.trim(),
+            authMode = effectiveAuthMode,
             systemPrompt = prompt,
             isEnabled = isEnabled,
             endpointMode = endpointMode,
@@ -1119,6 +1138,7 @@ private fun buildUpdatedProvider(
             name = name.trim(),
             baseUrl = baseUrl.trim(),
             apiKey = apiKey.trim(),
+            authMode = effectiveAuthMode,
             systemPrompt = prompt,
             isEnabled = isEnabled,
             endpointMode = endpointMode,
@@ -1128,6 +1148,7 @@ private fun buildUpdatedProvider(
             name = name.trim(),
             baseUrl = baseUrl.trim(),
             apiKey = apiKey.trim(),
+            authMode = effectiveAuthMode,
             systemPrompt = prompt,
             isEnabled = isEnabled,
             anthropicVersion = anthropicVersion.trim().ifBlank { AnthropicProviderSetting.DEFAULT_ANTHROPIC_VERSION },
@@ -1135,8 +1156,9 @@ private fun buildUpdatedProvider(
     }
 }
 
-private fun validateProviderDraft(draft: ProviderConfigDraft): String? {
+private fun validateProviderDraft(provider: ProviderSetting, draft: ProviderConfigDraft): String? {
     if (draft.name.isBlank()) return "名称不能为空"
+    if (effectiveProviderAuthMode(provider, draft.authMode) == ProviderAuthModes.CODEX_OAUTH) return null
     val uri = runCatching { java.net.URI(draft.baseUrl.trim()) }.getOrNull()
     if (uri == null || uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank()) {
         return "Base URL 必须是有效的 HTTP(S) 地址"

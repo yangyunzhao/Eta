@@ -91,6 +91,28 @@ class RuntimeConfigRepositoryTest {
     }
 
     @Test
+    fun codexOAuthRuntimeAlwaysProjectsResponsesWithoutChangingStoredApiEndpoint() {
+        val provider = OpenAiCompatibleProviderSetting(
+            id = BuiltinProviders.OPENAI_ID,
+            name = "OpenAI",
+            baseUrl = "https://api.openai.com/v1",
+            sourceType = ProviderSourceTypes.OPENAI,
+            apiKey = "preserved-api-key",
+            authMode = ProviderAuthModes.CODEX_OAUTH,
+            isBuiltIn = true,
+            endpointMode = OpenAiEndpointMode.CHAT_COMPLETIONS,
+        )
+        val model = Model(id = "model", modelId = "gpt-5.5", displayName = "GPT-5.5")
+
+        val config = RuntimeConfigRepository.buildRuntimeConfig(provider, model)
+
+        assertEquals(OpenAiEndpointMode.RESPONSES, config.openAiEndpointMode)
+        assertEquals(OpenAiEndpointMode.CHAT_COMPLETIONS, provider.endpointMode)
+        assertEquals("preserved-api-key", provider.apiKey)
+        config.validateForTest()
+    }
+
+    @Test
     fun codexOAuthValidationAcceptsEmptyApiKey() {
         codexConfig().validateForTest()
     }
