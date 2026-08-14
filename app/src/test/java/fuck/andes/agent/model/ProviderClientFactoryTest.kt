@@ -27,6 +27,7 @@ class ProviderClientFactoryTest {
         val client = ProviderClientFactory.getClient(
             config = codexConfig(),
             codexCredentialProvider = UnauthenticatedCredentialProvider,
+            codexOAuthEnabled = true,
         )
 
         assertTrue(client is CodexResponsesProvider)
@@ -44,11 +45,82 @@ class ProviderClientFactoryTest {
     @Test
     fun `Codex OAuth without credential dependency fails closed instead of using API key provider`() {
         val thrown = runCatching {
-            ProviderClientFactory.getClient(codexConfig())
+            ProviderClientFactory.getClient(codexConfig(), codexOAuthEnabled = true)
         }.exceptionOrNull()
 
         assertTrue(thrown is IllegalStateException)
         assertTrue(thrown?.message.orEmpty().contains("credential", ignoreCase = true))
+    }
+
+    @Test
+    fun `disabled Codex OAuth fails closed before credentials or HTTP can be used`() {
+        val credentialProvider = RecordingCredentialProvider()
+
+        val thrown = runCatching {
+            ProviderClientFactory.getClient(
+                config = codexConfig(),
+                codexCredentialProvider = credentialProvider,
+                codexOAuthEnabled = false,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(thrown is CodexAuthException)
+        assertEquals(CodexAuthFailure.UNSUPPORTED, (thrown as CodexAuthException).failure)
+        assertEquals(0, credentialProvider.callCount)
+    }
+
+    @Test
+    fun `disabled Codex OAuth leaves API key Anthropic and custom routing unchanged`() {
+        assertSame(
+            OpenAiResponsesProvider,
+            ProviderClientFactory.getClient(apiKeyConfig(), codexOAuthEnabled = false),
+        )
+        assertSame(
+            AnthropicMessagesProvider,
+            ProviderClientFactory.getClient(
+                apiKeyConfig().copy(
+                    providerType = ProviderTypes.ANTHROPIC,
+                    providerSourceType = ProviderSourceTypes.ANTHROPIC,
+                    openAiEndpointMode = "",
+                ),
+                codexOAuthEnabled = false,
+            ),
+        )
+        assertSame(
+            OpenAiChatCompletionsProvider,
+            ProviderClientFactory.getClient(
+                apiKeyConfig().copy(openAiEndpointMode = OpenAiEndpointMode.CHAT_COMPLETIONS),
+                codexOAuthEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `raw Gradle property drives the default Factory Codex gate`() {
+        val expectedEnabled = when (
+            val rawProperty = checkNotNull(System.getProperty("eta.test.codexOAuthBuildProperty")) {
+                "Gradle must expose the raw eta.codexOAuthEnabled property to unit tests"
+            }
+        ) {
+            "<unset>" -> true
+            "true" -> true
+            "false" -> false
+            else -> error("unexpected test build property: $rawProperty")
+        }
+
+        val result = runCatching {
+            ProviderClientFactory.getClient(
+                config = codexConfig(),
+                codexCredentialProvider = UnauthenticatedCredentialProvider,
+            )
+        }
+        if (expectedEnabled) {
+            assertTrue(result.getOrThrow() is CodexResponsesProvider)
+        } else {
+            val failure = result.exceptionOrNull()
+            assertTrue(failure is CodexAuthException)
+            assertEquals(CodexAuthFailure.UNSUPPORTED, (failure as CodexAuthException).failure)
+        }
     }
 
     @Test
@@ -99,5 +171,30 @@ class ProviderClientFactoryTest {
             providerId: String,
             rejectedAccessToken: String,
         ): Boolean = false
+    }
+
+    private class RecordingCredentialProvider : CodexCredentialProvider {
+        var callCount: Int = 0
+
+        override fun requireValidCredential(providerId: String): CodexOAuthCredential {
+            callCount++
+            error("disabled feature must not load credentials")
+        }
+
+        override fun refreshAfterUnauthorized(
+            providerId: String,
+            rejectedAccessToken: String,
+        ): CodexOAuthCredential {
+            callCount++
+            error("disabled feature must not refresh credentials")
+        }
+
+        override fun invalidateAfterUnauthorized(
+            providerId: String,
+            rejectedAccessToken: String,
+        ): Boolean {
+            callCount++
+            error("disabled feature must not invalidate credentials")
+        }
     }
 }

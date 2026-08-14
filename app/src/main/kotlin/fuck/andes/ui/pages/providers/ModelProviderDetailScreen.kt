@@ -323,7 +323,7 @@ private fun ProviderConfigTab(
                         )
                     }
                 }
-                if (!codexMode) {
+                if (draft.authMode != ProviderAuthModes.CODEX_OAUTH) {
                     HorizontalDivider()
                     BasicComponent(
                         title = "测试连接",
@@ -1120,9 +1120,10 @@ internal fun buildUpdatedProvider(
     endpointMode: String,
     hostedWebSearchEnabled: Boolean,
     anthropicVersion: String,
+    codexOAuthEnabled: Boolean = fuck.andes.data.model.CodexOAuthFeaturePolicy.isEnabled,
 ): ProviderSetting {
     val prompt = systemPrompt.trim().takeIf { it.isNotBlank() }
-    val effectiveAuthMode = effectiveProviderAuthMode(source, authMode)
+    val effectiveAuthMode = effectiveProviderAuthMode(source, authMode, codexOAuthEnabled)
     return when (source) {
         is OpenAiCompatibleProviderSetting -> source.copy(
             name = name.trim(),
@@ -1158,7 +1159,10 @@ internal fun buildUpdatedProvider(
 
 private fun validateProviderDraft(provider: ProviderSetting, draft: ProviderConfigDraft): String? {
     if (draft.name.isBlank()) return "名称不能为空"
-    if (effectiveProviderAuthMode(provider, draft.authMode) == ProviderAuthModes.CODEX_OAUTH) return null
+    if (
+        supportsCodexOAuth(provider) &&
+        draft.authMode == ProviderAuthModes.CODEX_OAUTH
+    ) return null
     val uri = runCatching { java.net.URI(draft.baseUrl.trim()) }.getOrNull()
     if (uri == null || uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank()) {
         return "Base URL 必须是有效的 HTTP(S) 地址"

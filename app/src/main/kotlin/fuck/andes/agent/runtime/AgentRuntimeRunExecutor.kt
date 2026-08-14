@@ -19,7 +19,7 @@ import fuck.andes.agent.tool.PendingSkillConflictCapabilityParser
 import fuck.andes.agent.tool.ToolExecutionDecision
 import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.core.safeLogType
-import fuck.andes.data.model.ProviderAuthModes
+import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import fuck.andes.data.repository.AgentMemoryRepository
 import kotlinx.coroutines.runBlocking
 
@@ -164,7 +164,7 @@ internal class AgentRuntimeRunExecutor(
             val modelProvider = ProviderClientFactory.getClient(
                 config = request.config,
                 codexCredentialProvider = if (
-                    request.config.authMode == ProviderAuthModes.CODEX_OAUTH
+                    CodexOAuthFeaturePolicy.shouldResolveCredential(request.config.authMode)
                 ) {
                     FuckAndesApp.requireCodexCredentialProvider()
                 } else {

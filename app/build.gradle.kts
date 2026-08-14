@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.Test
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -16,6 +18,23 @@ val hasReleaseSigning = listOf(
     releaseKeyPassword
 ).all { !it.isNullOrBlank() }
 
+val rawCodexOAuthBuildProperty = providers.gradleProperty("eta.codexOAuthEnabled")
+val codexOAuthEnabled = rawCodexOAuthBuildProperty
+    .map { rawValue ->
+        rawValue.toBooleanStrictOrNull()
+            ?: throw GradleException(
+                "eta.codexOAuthEnabled must be either true or false",
+            )
+    }
+    .orElse(true)
+
+tasks.withType<Test>().configureEach {
+    systemProperty(
+        "eta.test.codexOAuthBuildProperty",
+        rawCodexOAuthBuildProperty.orElse("<unset>").get(),
+    )
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
@@ -33,6 +52,11 @@ android {
         versionCode = 260
         versionName = "2.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "boolean",
+            "CODEX_OAUTH_ENABLED",
+            codexOAuthEnabled.get().toString(),
+        )
     }
 
     signingConfigs {
@@ -67,7 +91,7 @@ android {
     }
 
     buildFeatures {
-        buildConfig = false
+        buildConfig = true
         compose = true
     }
 

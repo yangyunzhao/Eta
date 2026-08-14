@@ -63,8 +63,20 @@ class CodexDeviceLoginContentTest {
 
     @Test
     fun codexAuthenticationIsOfferedOnlyForTheBuiltInOpenAiProvider() {
-        assertEquals(true, supportsCodexOAuth(BuiltinProviders.providerById(BuiltinProviders.OPENAI_ID)!!))
-        assertEquals(false, supportsCodexOAuth(BuiltinProviders.providerById(BuiltinProviders.DEEPSEEK_ID)!!))
+        assertEquals(
+            true,
+            supportsCodexOAuth(
+                BuiltinProviders.providerById(BuiltinProviders.OPENAI_ID)!!,
+                codexOAuthEnabled = true,
+            ),
+        )
+        assertEquals(
+            false,
+            supportsCodexOAuth(
+                BuiltinProviders.providerById(BuiltinProviders.DEEPSEEK_ID)!!,
+                codexOAuthEnabled = true,
+            ),
+        )
         assertEquals(
             false,
             supportsCodexOAuth(
@@ -73,8 +85,95 @@ class CodexDeviceLoginContentTest {
                     name = "OpenAI copy",
                     baseUrl = "https://api.openai.com/v1",
                 ),
+                codexOAuthEnabled = true,
             ),
         )
+    }
+
+    @Test
+    fun disabledBuildHidesOAuthEntryAndKeepsExistingCodexProviderFields() {
+        val openAi = (BuiltinProviders.providerById(BuiltinProviders.OPENAI_ID) as OpenAiCompatibleProviderSetting)
+            .copy(
+                baseUrl = "https://preserved.example/v1",
+                apiKey = "preserved-api-key",
+                authMode = ProviderAuthModes.CODEX_OAUTH,
+                endpointMode = OpenAiEndpointMode.CHAT_COMPLETIONS,
+            )
+
+        assertFalse(supportsCodexOAuth(openAi, codexOAuthEnabled = false))
+        val saved = buildUpdatedProvider(
+            source = openAi,
+            name = openAi.name,
+            baseUrl = openAi.baseUrl,
+            apiKey = openAi.apiKey,
+            authMode = openAi.authMode,
+            systemPrompt = openAi.systemPrompt.orEmpty(),
+            isEnabled = openAi.isEnabled,
+            endpointMode = openAi.endpointMode,
+            hostedWebSearchEnabled = openAi.hostedWebSearchEnabled,
+            anthropicVersion = "",
+            codexOAuthEnabled = false,
+        ) as OpenAiCompatibleProviderSetting
+
+        assertEquals(ProviderAuthModes.CODEX_OAUTH, saved.authMode)
+        assertEquals("preserved-api-key", saved.apiKey)
+        assertEquals("https://preserved.example/v1", saved.baseUrl)
+        assertEquals(OpenAiEndpointMode.CHAT_COMPLETIONS, saved.endpointMode)
+    }
+
+    @Test
+    fun disabledBuildRequiresExplicitSwitchBeforeShowingApiKeyFields() {
+        var requestedAuthMode: String? = null
+        composeRule.setContent {
+            ProviderAuthenticationContent(
+                supportsCodexOAuth = false,
+                codexOAuthFeatureEnabled = false,
+                authMode = ProviderAuthModes.CODEX_OAUTH,
+                baseUrl = "https://preserved.example/v1",
+                apiKey = "preserved-api-key",
+                apiKeyVisible = false,
+                loginState = CodexLoginState.Idle,
+                launcher = RecordingLauncher(),
+                onAuthModeChange = { requestedAuthMode = it },
+                onBaseUrlChange = {},
+                onApiKeyChange = {},
+                onToggleApiKeyVisibility = {},
+                onBeginLogin = {},
+                onCancelLogin = {},
+                onLogout = {},
+            )
+        }
+
+        composeRule.onNodeWithText("此构建已关闭 Codex OAuth").assertIsDisplayed()
+        composeRule.onNodeWithText("认证方式").assertDoesNotExist()
+        composeRule.onNodeWithText("使用 Codex 设备码登录").assertDoesNotExist()
+        composeRule.onNode(hasText("Base URL") and hasSetTextAction()).assertDoesNotExist()
+        composeRule.onNode(hasText("API Key") and hasSetTextAction()).assertDoesNotExist()
+        composeRule.onNodeWithText("切换到 API Key").performClick()
+        composeRule.runOnIdle { assertEquals("", requestedAuthMode) }
+    }
+
+    @Test
+    fun disabledBuildDoesNotOptAnApiKeyProviderIntoCodexOAuth() {
+        val openAi = BuiltinProviders.providerById(BuiltinProviders.OPENAI_ID) as OpenAiCompatibleProviderSetting
+
+        val saved = buildUpdatedProvider(
+            source = openAi,
+            name = openAi.name,
+            baseUrl = openAi.baseUrl,
+            apiKey = openAi.apiKey,
+            authMode = ProviderAuthModes.CODEX_OAUTH,
+            systemPrompt = openAi.systemPrompt.orEmpty(),
+            isEnabled = openAi.isEnabled,
+            endpointMode = openAi.endpointMode,
+            hostedWebSearchEnabled = openAi.hostedWebSearchEnabled,
+            anthropicVersion = "",
+            codexOAuthEnabled = false,
+        )
+
+        assertEquals("", saved.authMode)
+        assertEquals(openAi.apiKey, saved.apiKey)
+        assertEquals(openAi.baseUrl, saved.baseUrl)
     }
 
     @Test
@@ -82,6 +181,7 @@ class CodexDeviceLoginContentTest {
         composeRule.setContent {
             ProviderAuthenticationContent(
                 supportsCodexOAuth = false,
+                codexOAuthFeatureEnabled = true,
                 authMode = "codex_oauth",
                 baseUrl = "https://api.example.test/v1",
                 apiKey = "synthetic-key",
@@ -123,6 +223,7 @@ class CodexDeviceLoginContentTest {
             endpointMode = openAi.endpointMode,
             hostedWebSearchEnabled = openAi.hostedWebSearchEnabled,
             anthropicVersion = "",
+            codexOAuthEnabled = true,
         ) as OpenAiCompatibleProviderSetting
         assertEquals(ProviderAuthModes.CODEX_OAUTH, oauth.authMode)
         assertEquals("preserved-api-key", oauth.apiKey)
@@ -140,6 +241,7 @@ class CodexDeviceLoginContentTest {
             endpointMode = openAi.endpointMode,
             hostedWebSearchEnabled = openAi.hostedWebSearchEnabled,
             anthropicVersion = "",
+            codexOAuthEnabled = true,
         )
         assertEquals("", unknown.authMode)
 
@@ -160,6 +262,7 @@ class CodexDeviceLoginContentTest {
             endpointMode = unsupported.endpointMode,
             hostedWebSearchEnabled = false,
             anthropicVersion = "",
+            codexOAuthEnabled = true,
         )
         assertEquals("", normalizedUnsupported.authMode)
         assertEquals("custom-key", normalizedUnsupported.apiKey)
@@ -247,6 +350,7 @@ class CodexDeviceLoginContentTest {
         composeRule.setContent {
             ProviderAuthenticationContent(
                 supportsCodexOAuth = true,
+                codexOAuthFeatureEnabled = true,
                 authMode = authMode,
                 baseUrl = baseUrl,
                 apiKey = apiKey,

@@ -60,7 +60,7 @@
 | Task 7 / Step 3 | 已完成 | 已实现 Provider 级状态刷新、认证模式规范化和不改写持久配置的 OAuth Responses 运行时派生。 |
 | Task 7 / Step 4 | 已完成 | 强制 fresh UI/Manager/Runtime/Repository/API Key 六类 58/58 通过；独立复审 APPROVED。 |
 | Task 7 / Step 5 | 已完成 | 独立复审 APPROVED，设备码登录 UI 已用中文提交为独立检查点。 |
-| Task 8 / Step 1 | 未开始 | 待所有实现任务完成后增加开关及关闭行为测试。 |
+| Task 8 / Step 1 | 已完成 | 默认/关闭生产链各 23/23、扩展 85/85、默认构建通过；独立复审 APPROVED。 |
 | Task 8 / Step 2 | 未开始 | 待功能完成后按实际行为更新用户文档。 |
 | Task 8 / Step 3 | 未开始 | 待运行格式检查和完整单元测试。 |
 | Task 8 / Step 4 | 未开始 | 待构建 Debug APK。 |
@@ -464,7 +464,7 @@ git commit -m "feat(ui): 新增 Codex 设备码登录界面"
 **Interfaces:**
 - Produces: `BuildConfig.CODEX_OAUTH_ENABLED`，默认在下游构建启用。
 
-- [ ] **Step 1: 增加编译期开关并覆盖关闭行为**
+- [x] **Step 1: 增加编译期开关并覆盖关闭行为**
 
 关闭时不显示 OAuth 入口；数据库字段和 API Key Provider 仍正常。测试断言关闭开关不会自动选择 OAuth 或修改既有 Provider。
 

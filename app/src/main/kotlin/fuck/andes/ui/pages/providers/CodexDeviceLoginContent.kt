@@ -19,11 +19,9 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
 import fuck.andes.data.auth.CodexAuthFailure
 import fuck.andes.data.auth.CodexLoginState
-import fuck.andes.data.model.OpenAiCompatibleProviderSetting
+import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ProviderSetting
-import fuck.andes.data.model.ProviderSourceTypes
-import fuck.andes.data.provider.BuiltinProviders
 import fuck.andes.ui.components.StatusError
 import fuck.andes.ui.components.StatusSuccess
 import top.yukonga.miuix.kmp.basic.DropdownItem
@@ -38,6 +36,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 internal fun ProviderAuthenticationContent(
     supportsCodexOAuth: Boolean,
+    codexOAuthFeatureEnabled: Boolean = CodexOAuthFeaturePolicy.isEnabled,
     authMode: String,
     baseUrl: String,
     apiKey: String,
@@ -53,6 +52,8 @@ internal fun ProviderAuthenticationContent(
     onLogout: () -> Unit,
 ) {
     val codexMode = supportsCodexOAuth && authMode == ProviderAuthModes.CODEX_OAUTH
+    val disabledCodexMode =
+        !codexOAuthFeatureEnabled && authMode == ProviderAuthModes.CODEX_OAUTH
     if (supportsCodexOAuth) {
         WindowSpinnerPreference(
             items = listOf(
@@ -68,7 +69,19 @@ internal fun ProviderAuthenticationContent(
         )
     }
 
-    if (codexMode) {
+    if (disabledCodexMode) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(text = "此构建已关闭 Codex OAuth", color = StatusError)
+            Text("现有认证配置保持不变；切换后保存才会改用 API Key。")
+            TextButton(
+                text = "切换到 API Key",
+                onClick = { onAuthModeChange("") },
+            )
+        }
+    } else if (codexMode) {
         CodexDeviceLoginContent(
             state = loginState,
             launcher = launcher,
@@ -168,18 +181,20 @@ internal fun CodexDeviceLoginContent(
     }
 }
 
-internal fun supportsCodexOAuth(provider: ProviderSetting): Boolean =
-    provider is OpenAiCompatibleProviderSetting &&
-        provider.isBuiltIn &&
-        provider.id == BuiltinProviders.OPENAI_ID &&
-        provider.sourceType == ProviderSourceTypes.OPENAI
+internal fun supportsCodexOAuth(
+    provider: ProviderSetting,
+    codexOAuthEnabled: Boolean = CodexOAuthFeaturePolicy.isEnabled,
+): Boolean = CodexOAuthFeaturePolicy.supportsProvider(provider, codexOAuthEnabled)
 
-internal fun effectiveProviderAuthMode(provider: ProviderSetting, requestedAuthMode: String): String =
-    if (supportsCodexOAuth(provider) && requestedAuthMode == ProviderAuthModes.CODEX_OAUTH) {
-        ProviderAuthModes.CODEX_OAUTH
-    } else {
-        ""
-    }
+internal fun effectiveProviderAuthMode(
+    provider: ProviderSetting,
+    requestedAuthMode: String,
+    codexOAuthEnabled: Boolean = CodexOAuthFeaturePolicy.isEnabled,
+): String = CodexOAuthFeaturePolicy.authModeForSave(
+    provider = provider,
+    requestedAuthMode = requestedAuthMode,
+    enabled = codexOAuthEnabled,
+)
 
 private fun CodexAuthFailure.safeUserMessage(): String = when (this) {
     CodexAuthFailure.NOT_AUTHENTICATED -> "尚未登录 Codex"
