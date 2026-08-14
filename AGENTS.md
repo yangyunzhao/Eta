@@ -43,6 +43,9 @@
 - OAuth 端点和 Codex Responses 端点必须固定为 HTTPS，不受自定义 Base URL 或 cleartext 网络配置影响。
 - access token、refresh token、ID token、账号 ID、设备码和 PKCE 材料不得进入 Room Provider 表、RemotePreferences、Binder、日志、异常正文或测试快照。
 - OAuth 失败不得自动切换到 API Key；真实 Codex 调用必须集中在最终人工验收并明确消耗共享额度。
+- 每次构建用于候选、分发、tag 或 GitHub Release 的 APK 前，必须查询当时最新的官方 Codex CLI 稳定 release，记录已验证的 release tag 及 peeled commit，并与本项目声明的 Codex 协议兼容基线进行比对。
+- 出包前的 Codex 兼容性核对至少包括：OAuth 设备码与刷新契约、固定信任域和路径、必需 Header、模型目录 `client_version` 与响应 schema、Responses 请求字段及 SSE 终态。如最新稳定 CLI 已出现本项目尚未兼容的协议变化，必须先完成代码、测试和真机验证，不得仅修改版本号或带着已知不兼容问题出包。
+- `CODEX_PROTOCOL_COMPAT_VERSION` 表示已经完整验证的协议基线，不得根据最新 CLI 版本自动跟随或冒充更新；只有上述契约与回归验证通过后才能升级。仅用于本地开发定位且不对外分发的 Debug APK 不视为本规则中的“出包”。
 
 ## 修改与验证
 
