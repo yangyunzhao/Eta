@@ -5,6 +5,7 @@ import fuck.andes.data.auth.CodexAuthException
 import fuck.andes.data.auth.CodexAuthFailure
 import fuck.andes.data.auth.CodexCredentialProvider
 import fuck.andes.data.auth.CodexOAuthCredential
+import fuck.andes.data.auth.CODEX_PROTOCOL_COMPAT_VERSION
 import fuck.andes.data.model.Model
 import java.io.IOException
 import okhttp3.HttpUrl
@@ -124,7 +125,7 @@ internal class CodexModelsClient private constructor(
             .scheme("https")
             .host("chatgpt.com")
             .addPathSegments("backend-api/codex/models")
-            .addQueryParameter("client_version", "0.147.0")
+            .addQueryParameter("client_version", CODEX_PROTOCOL_COMPAT_VERSION)
             .build()
         private val TEST_LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1")
         private val SAFE_HEADER_CHAR_RANGE = 0x21..0x7e

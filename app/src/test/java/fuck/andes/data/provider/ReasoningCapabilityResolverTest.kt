@@ -4,6 +4,7 @@ import fuck.andes.data.model.Model
 import fuck.andes.data.model.ModelReasoningCapabilities
 import fuck.andes.data.model.ProviderSourceTypes
 import fuck.andes.data.model.ReasoningEffort
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -12,9 +13,28 @@ class ReasoningCapabilityResolverTest {
     @Test
     fun userFacingEffortLabelsAreStableEnglishValues() {
         assertEquals(
-            listOf("Off", "Default", "Low", "Medium", "High", "XHigh", "Max"),
+            listOf("Off", "Default", "Low", "Medium", "High", "XHigh", "Max", "Ultra"),
             ReasoningEffort.entries.map(ReasoningEffort::displayName),
         )
+    }
+
+    @Test
+    fun ultraParsesSerializesAndRemainsSelectable() {
+        val capabilities = ModelReasoningCapabilities(
+            supportedEfforts = listOf(ReasoningEffort.MAX, ReasoningEffort.ULTRA),
+        )
+
+        assertEquals(ReasoningEffort.ULTRA, ReasoningEffort.fromWireValue(" ultra "))
+        assertEquals("\"ultra\"", Json.encodeToString(ReasoningEffort.ULTRA))
+        assertEquals(
+            ReasoningEffort.ULTRA,
+            Json.decodeFromString<ReasoningEffort>("\"ultra\""),
+        )
+        assertEquals(
+            listOf(ReasoningEffort.DEFAULT, ReasoningEffort.MAX, ReasoningEffort.ULTRA),
+            capabilities.selectableEfforts,
+        )
+        assertEquals(ReasoningEffort.ULTRA, capabilities.normalize(ReasoningEffort.ULTRA))
     }
 
     @Test

@@ -51,7 +51,15 @@ class RuntimeConfigRepositoryTest {
         assertEquals(ReasoningEffort.DEFAULT, config.reasoningEffort)
         assertEquals(true, config.thinkingEnabled)
         assertEquals(
-            ReasoningEffort.entries,
+            listOf(
+                ReasoningEffort.OFF,
+                ReasoningEffort.DEFAULT,
+                ReasoningEffort.LOW,
+                ReasoningEffort.MEDIUM,
+                ReasoningEffort.HIGH,
+                ReasoningEffort.XHIGH,
+                ReasoningEffort.MAX,
+            ),
             config.reasoningCapabilities?.selectableEfforts,
         )
         assertEquals(config, Json.decodeFromString<AgentModelClient.ModelConfig>(raw))

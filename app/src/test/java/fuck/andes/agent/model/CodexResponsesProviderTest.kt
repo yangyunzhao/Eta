@@ -8,10 +8,12 @@ import fuck.andes.data.auth.CodexCredentialProvider
 import fuck.andes.data.auth.CodexOAuthCredential
 import fuck.andes.data.model.CustomBody
 import fuck.andes.data.model.CustomHeader
+import fuck.andes.data.model.ModelReasoningCapabilities
 import fuck.andes.data.model.OpenAiEndpointMode
 import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ProviderSourceTypes
 import fuck.andes.data.model.ProviderTypes
+import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.data.provider.BuiltinProviders
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -102,6 +104,10 @@ class CodexResponsesProviderTest {
         provider.complete(
             ProviderRequest(
                 config = codexConfig().copy(
+                    reasoningEffort = ReasoningEffort.ULTRA,
+                    reasoningCapabilities = ModelReasoningCapabilities(
+                        supportedEfforts = listOf(ReasoningEffort.ULTRA),
+                    ),
                     customHeaders = listOf(
                         CustomHeader("Authorization", "Bearer attacker"),
                         CustomHeader("Originator", "attacker"),
@@ -128,13 +134,14 @@ class CodexResponsesProviderTest {
         assertEquals("Bearer access-one", request.headers["Authorization"])
         assertEquals("account-one", request.headers["ChatGPT-Account-ID"])
         assertEquals("codex_cli_rs", request.headers["originator"])
-        assertNotNull(request.headers["User-Agent"])
-        assertNotNull(request.headers["version"])
+        assertEquals("eta_codex_oauth/1", request.headers["User-Agent"])
+        assertEquals(null, request.headers["version"])
         assertEquals(null, request.headers["OpenAI-Beta"])
         val body = JSONObject(requireNotNull(request.body).utf8())
         assertEquals("gpt-5.5", body.getString("model"))
         assertTrue(body.getBoolean("stream"))
         assertFalse(body.getBoolean("store"))
+        assertEquals("ultra", body.getJSONObject("reasoning").getString("effort"))
         assertEquals("reasoning.encrypted_content", body.getJSONArray("include").getString(0))
         assertEquals(4, body.getJSONArray("input").length())
         assertEquals("function_call", body.getJSONArray("input").getJSONObject(2).getString("type"))

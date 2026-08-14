@@ -134,7 +134,6 @@ internal class CodexResponsesProvider private constructor(
                 .add("Authorization", "Bearer $accessToken")
                 .add("originator", ORIGINATOR)
                 .add("User-Agent", USER_AGENT)
-                .add("version", PROTOCOL_VERSION)
                 .apply {
                     accountId?.let { add("ChatGPT-Account-ID", it) }
                 }
@@ -278,7 +277,6 @@ internal class CodexResponsesProvider private constructor(
         private const val MAX_RATE_LIMIT_SIGNAL_BYTES = 16_384L
         private const val ORIGINATOR = "codex_cli_rs"
         private const val USER_AGENT = "eta_codex_oauth/1"
-        private const val PROTOCOL_VERSION = "1"
 
         internal fun forTest(
             credentialProvider: CodexCredentialProvider,

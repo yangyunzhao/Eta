@@ -35,6 +35,9 @@ enum class ReasoningEffort(
 
     @SerialName("max")
     MAX("max", "Max", 6),
+
+    @SerialName("ultra")
+    ULTRA("ultra", "Ultra", 7),
     ;
 
     val enablesReasoning: Boolean

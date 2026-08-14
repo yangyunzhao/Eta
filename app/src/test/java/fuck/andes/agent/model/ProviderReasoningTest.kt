@@ -45,15 +45,15 @@ class ProviderReasoningTest {
     }
 
     @Test
-    fun openAiNamedEffortOverridesAdvancedValue() {
+    fun openAiNamedUltraEffortOverridesAdvancedValue() {
         val request = JSONObject().put("reasoning_effort", "low")
 
         ProviderReasoning.applyOpenAiCompatibleRequest(
             request,
-            config(source = ProviderSourceTypes.OPENAI, effort = ReasoningEffort.XHIGH),
+            config(source = ProviderSourceTypes.OPENAI, effort = ReasoningEffort.ULTRA),
         )
 
-        assertEquals("xhigh", request.getString("reasoning_effort"))
+        assertEquals("ultra", request.getString("reasoning_effort"))
     }
 
     @Test

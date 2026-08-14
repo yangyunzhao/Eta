@@ -268,6 +268,7 @@ internal object RemoteModelFetcher {
                         ReasoningEffort.HIGH,
                         ReasoningEffort.XHIGH,
                         ReasoningEffort.MAX,
+                        ReasoningEffort.ULTRA,
                     )
                 } else {
                     emptyList()

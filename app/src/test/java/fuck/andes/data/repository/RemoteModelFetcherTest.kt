@@ -76,7 +76,13 @@ class RemoteModelFetcherTest {
         assertTrue(model.supportsReasoning)
         assertEquals(ReasoningEffort.MEDIUM, model.reasoningCapabilities?.defaultEffort)
         assertEquals(
-            listOf(ReasoningEffort.DEFAULT, ReasoningEffort.LOW, ReasoningEffort.MEDIUM, ReasoningEffort.HIGH),
+            listOf(
+                ReasoningEffort.DEFAULT,
+                ReasoningEffort.LOW,
+                ReasoningEffort.MEDIUM,
+                ReasoningEffort.HIGH,
+                ReasoningEffort.ULTRA,
+            ),
             model.reasoningCapabilities?.selectableEfforts,
         )
     }

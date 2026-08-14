@@ -229,7 +229,7 @@ class AgentRuntimeWireTest {
                 deviceSensitiveReadTools = true,
                 deviceSensitiveActionTools = true,
                 thinkingEnabled = true,
-                reasoningEffort = ReasoningEffort.HIGH,
+                reasoningEffort = ReasoningEffort.ULTRA,
                 reasoningCapabilities = ModelReasoningCapabilities(
                     supportedEfforts = listOf(ReasoningEffort.HIGH),
                     canDisable = true,
@@ -270,7 +270,7 @@ class AgentRuntimeWireTest {
 
         assertEquals(request, roundTripped)
         assertEquals(262_144, roundTripped.config.contextWindow)
-        assertEquals(ReasoningEffort.HIGH, roundTripped.config.reasoningEffort)
+        assertEquals(ReasoningEffort.ULTRA, roundTripped.config.reasoningEffort)
     }
 
     @Test

@@ -139,6 +139,7 @@ internal object ProviderReasoning {
             ReasoningEffort.HIGH -> 32_768
             ReasoningEffort.XHIGH -> 65_536
             ReasoningEffort.MAX -> config.reasoningCapabilities?.maxBudgetTokens ?: 65_536
+            ReasoningEffort.ULTRA -> config.reasoningCapabilities?.maxBudgetTokens ?: 65_536
             ReasoningEffort.OFF,
             ReasoningEffort.DEFAULT -> return
         }
@@ -172,6 +173,7 @@ internal object ProviderReasoning {
             ReasoningEffort.HIGH -> 8_192
             ReasoningEffort.XHIGH -> 16_384
             ReasoningEffort.MAX -> 32_768
+            ReasoningEffort.ULTRA -> 32_768
             ReasoningEffort.OFF,
             ReasoningEffort.DEFAULT -> return
         }.coerceAtMost(config.reasoningCapabilities?.maxBudgetTokens ?: 32_768)

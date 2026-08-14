@@ -4,6 +4,7 @@ import fuck.andes.data.auth.CodexAuthException
 import fuck.andes.data.auth.CodexAuthFailure
 import fuck.andes.data.auth.CodexCredentialProvider
 import fuck.andes.data.auth.CodexOAuthCredential
+import fuck.andes.data.auth.CODEX_PROTOCOL_COMPAT_VERSION
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -142,7 +143,7 @@ class CodexModelsClientTest {
         CodexModelsClient.forTest(
             credentialProvider = credentialProvider,
             httpClient = OkHttpClient(),
-            endpointUrl = server.url("/models?client_version=0.147.0"),
+            endpointUrl = server.url("/models?client_version=$CODEX_PROTOCOL_COMPAT_VERSION"),
         )
 
     private fun credentials(
