@@ -362,6 +362,71 @@ class CodexResponsesProviderTest {
     }
 
     @Test
+    fun `debug trace distinguishes HTTP and SSE protocol failure stages without credentials`() {
+        val lines = mutableListOf<String>()
+        val logger = CodexProtocolDebugLogger(enabled = true) { _, line -> lines += line }
+        val tracedProvider = CodexResponsesProvider.forTest(
+            credentialProvider = SequenceCredentialProvider(
+                listOf(credential("access-secret-sentinel", "account-secret-sentinel")),
+            ),
+            httpClient = httpClient,
+            endpointUrl = server.url("/backend-api/codex/responses"),
+            debugLogger = logger,
+        )
+        val responses = listOf(
+            MockResponse.Builder()
+                .code(200)
+                .addHeader("Content-Type", "application/json")
+                .body("not-sse")
+                .build(),
+            sseResponse("data: invalid-auth-sentinel\n\n"),
+            sseResponse(
+                event(
+                    "error",
+                    JSONObject()
+                        .put("code", "bad_request")
+                        .put("authorization", "top-level-auth-sentinel"),
+                ),
+            ),
+            sseResponse(
+                event(
+                    "response.failed",
+                    JSONObject().put(
+                        "response",
+                        JSONObject()
+                            .put("status", "failed")
+                            .put("error", JSONObject().put("access_token", "failed-auth-sentinel")),
+                    ),
+                ),
+            ),
+            sseResponse(completedSse("ok")),
+        )
+
+        responses.forEach { response ->
+            server.enqueue(response)
+            runCatching {
+                tracedProvider.complete(basicRequest(), AgentRunController())
+            }
+        }
+
+        val trace = lines.joinToString("\n")
+        listOf(
+            "content_type_mismatch",
+            "sse_invalid_json",
+            "sse_top_level_error",
+            "sse_response_failed",
+            "sse_complete",
+        ).forEach { stage -> assertTrue("missing stage $stage", trace.contains(stage)) }
+        listOf(
+            "access-secret-sentinel",
+            "account-secret-sentinel",
+            "invalid-auth-sentinel",
+            "top-level-auth-sentinel",
+            "failed-auth-sentinel",
+        ).forEach { secret -> assertFalse("leaked $secret", trace.contains(secret)) }
+    }
+
+    @Test
     fun `redirect is not followed`() {
         server.enqueue(
             MockResponse.Builder()

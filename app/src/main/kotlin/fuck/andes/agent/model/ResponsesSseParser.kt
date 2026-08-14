@@ -9,12 +9,23 @@ import org.json.JSONObject
 
 internal object ResponsesSseParser {
     private const val MAX_ERROR_CHARS = 600
+
+    internal interface Observer {
+        fun onFrame(index: Int, eventType: String, event: JSONObject)
+
+        fun onStage(stage: String, frameIndex: Int? = null, eventType: String? = null)
+    }
+
     fun parse(
         stream: java.io.InputStream?,
         runController: AgentRunController,
         onEvent: (ProviderEvent) -> Unit,
+        observer: Observer? = null,
     ): JSONObject {
-        if (stream == null) error("模型接口未返回响应流")
+        if (stream == null) {
+            observer?.onStage("sse_empty_stream")
+            error("模型接口未返回响应流")
+        }
         val streamedText = StringBuilder()
         val streamedReasoning = StringBuilder()
         val toolCalls = linkedMapOf<String, StreamingFunctionCall>()
@@ -25,6 +36,7 @@ internal object ResponsesSseParser {
         var terminal: JSONObject? = null
         var terminalType: String? = null
         var sawEvent = false
+        var frameIndex = 0
 
         BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { reader ->
             val dataLines = mutableListOf<String>()
@@ -34,9 +46,20 @@ internal object ResponsesSseParser {
                 dataLines.clear()
                 if (payload.isBlank() || payload == "[DONE]") return
                 sawEvent = true
-                val event = JSONObject(payload)
+                val currentFrameIndex = frameIndex++
+                val event = try {
+                    JSONObject(payload)
+                } catch (failure: Exception) {
+                    observer?.onStage("sse_invalid_json", currentFrameIndex)
+                    throw failure
+                }
+                val eventType = event.optString("type")
+                observer?.onFrame(currentFrameIndex, eventType, event)
+                if (event.optJSONObject("error") != null) {
+                    observer?.onStage("sse_top_level_error", currentFrameIndex, eventType)
+                }
                 throwEventError(event)
-                when (val type = event.optString("type")) {
+                when (val type = eventType) {
                     "response.output_text.delta" -> {
                         val delta = event.optString("delta")
                         if (delta.isNotEmpty()) {
@@ -141,8 +164,16 @@ internal object ResponsesSseParser {
                     "response.completed", "response.incomplete", "response.failed" -> {
                         terminalType = type
                         terminal = event.optJSONObject("response") ?: event
+                        observer?.onStage(
+                            if (type == "response.failed") "sse_response_failed" else "sse_terminal",
+                            currentFrameIndex,
+                            type,
+                        )
                     }
-                    "error" -> throwTopLevelEventError(event)
+                    "error" -> {
+                        observer?.onStage("sse_top_level_error", currentFrameIndex, type)
+                        throwTopLevelEventError(event)
+                    }
                 }
             }
 
@@ -161,8 +192,14 @@ internal object ResponsesSseParser {
             }
         }
 
-        if (!sawEvent) error("模型接口未返回 SSE data chunk")
-        val finalResponse = terminal ?: error("模型接口 Responses SSE 流缺少合法终止事件")
+        if (!sawEvent) {
+            observer?.onStage("sse_empty_stream")
+            error("模型接口未返回 SSE data chunk")
+        }
+        val finalResponse = terminal ?: run {
+            observer?.onStage("sse_missing_terminal")
+            error("模型接口 Responses SSE 流缺少合法终止事件")
+        }
         if (terminalType == "response.failed") throwResponseFailure(finalResponse)
 
         val terminalOutput = finalResponse.optJSONArray("output")

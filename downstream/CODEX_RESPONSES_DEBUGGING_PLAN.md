@@ -21,10 +21,10 @@
 
 | Step | 状态 | 证据 |
 |---|---|---|
-| Task 1 / Step 1–2 | 待开始 | 脱敏与预算 RED 尚未执行。 |
-| Task 1 / Step 3–5 | 待开始 | Logger GREEN、回归和提交尚未执行。 |
-| Task 2 / Step 1–2 | 待开始 | Provider/SSE 阶段 RED 尚未执行。 |
-| Task 2 / Step 3–5 | 待开始 | 接线 GREEN、回归和提交尚未执行。 |
+| Task 1 / Step 1–2 | 已完成 | 初始与复审修复测试均先行编写；指定 Gradle 命令先后因 Logger 缺失、`attempt` 接口缺失按预期 RED。 |
+| Task 1 / Step 3–5 | 已完成 | Logger GREEN：关闭开关 sink 为 0，64 KiB 安全截断及可重组 chunk 元数据已覆盖；与进度一并 amend `feat(debug): 增加 Codex 协议脱敏日志`。 |
+| Task 2 / Step 1–2 | 已完成 | MockWebServer 覆盖非 SSE、非法 JSON、顶层 error、response.failed 与 completed；新增 `debugLogger` 注入参数缺失时按预期 RED。 |
+| Task 2 / Step 3–5 | 已完成 | Provider/SSE 已接入固定阶段和脱敏合法帧；Codex/OpenAI 定向测试已 GREEN，联合回归通过后 amend 到同一功能提交。 |
 | Task 3 / Step 1–3 | 待开始 | APK 构建、安装和一次真实日志捕获尚未执行。 |
 | Task 4 / Step 1–5 | 待开始 | 根因测试、修复、复审和真机成功尚未执行。 |
 
@@ -43,27 +43,27 @@
 - Produces: `RequestTrace.logJson(stage: String, payload: JSONObject)`
 - Produces: `RequestTrace.logException(stage: String, throwable: Throwable)`，只序列化类名与 stack elements。
 
-- [ ] **Step 1: 写脱敏、分块和预算失败测试**
+- [x] **Step 1: 写脱敏、分块和预算失败测试**
 
 测试构造嵌套 JSON，包含 `access_token`、`idToken`、`account-id`、`device_code`、`pkceVerifier`、`headers`、`encrypted_content`、Bearer 与 JWT 字符串，同时包含普通 prompt/output；断言敏感值均为 `[REDACTED]`、普通字段保留、源 JSON 不变、每块不超过 3,000 字符、总量超过 512 KiB 时出现一次 `log_budget_exhausted`。
 
-- [ ] **Step 2: 运行 RED**
+- [x] **Step 2: 运行 RED**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexProtocolDebugLoggerTest'`
 
 Expected: 测试编译因 `CodexProtocolDebugLogger` 不存在而失败。
 
-- [ ] **Step 3: 实现最小 Logger**
+- [x] **Step 3: 实现最小 Logger**
 
 使用 `AtomicLong` 分配 request ID；key 规范化为小写并移除 `_`/`-` 后做敏感子串匹配；字符串再做 Bearer/JWT 正则替换；以深拷贝递归脱敏后分块。默认实例由 `BuildConfig.DEBUG` 控制，并使用 `Log.d("EtaCodexProtocol", line)`；测试注入 sink。
 
-- [ ] **Step 4: 运行 GREEN 与 Release 门禁测试**
+- [x] **Step 4: 运行 GREEN 与 Release 门禁测试**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexProtocolDebugLoggerTest'`
 
 Expected: 全部通过；`enabled=false` 时 sink 调用次数为 0。
 
-- [ ] **Step 5: 提交 Task 1**
+- [x] **Step 5: 提交 Task 1**
 
 提交范围仅 Logger、测试和本计划进度，中文提交说明：`feat(debug): 增加 Codex 协议脱敏日志`。
 
@@ -79,27 +79,27 @@ Expected: 全部通过；`enabled=false` 时 sink 调用次数为 0。
 - Consumes: Task 1 的 `CodexProtocolDebugLogger` 与 `RequestTrace`。
 - Produces: `ResponsesSseParser.Observer`，只接收 frame index、event type、合法脱敏前 JSONObject 引用、terminal type 或固定 parse failure 枚举；默认 `null` 保持 API Key 行为。
 
-- [ ] **Step 1: 写 HTTP/SSE 阶段失败测试**
+- [x] **Step 1: 写 HTTP/SSE 阶段失败测试**
 
 MockWebServer 分别返回 200 非 SSE、非法 JSON SSE、顶层 `error`、`response.failed`、正常 `response.completed`；断言固定 stage 能区分五种情况，非法 frame 原文及认证哨兵不出现，正常 API Key Responses sink 不产生 Codex 日志。
 
-- [ ] **Step 2: 运行 RED**
+- [x] **Step 2: 运行 RED**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest'`
 
 Expected: 因 observer/trace 接口尚未接线而失败。
 
-- [ ] **Step 3: 实现最小阶段接线**
+- [x] **Step 3: 实现最小阶段接线**
 
 Provider 记录 `request_built`、`http_headers`、`content_type_mismatch`、`sse_start`、`sse_complete`、`request_failed`；不把 credential 或 Headers 传给 logger。Parser 对合法 frame 报 event type 与 JSON，对非法 frame 报 `sse_invalid_json`，对空流、缺终态、顶层 error、failed terminal 分别报固定 stage；异常日志仅使用类名和 stack elements。
 
-- [ ] **Step 4: 运行 GREEN 与相关回归**
+- [x] **Step 4: 运行 GREEN 与相关回归**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexProtocolDebugLoggerTest' --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest' --tests '*ProviderClientFactoryTest' --tests '*AgentModelClientLoopTest'`
 
 Expected: 全部通过，无真实网络。
 
-- [ ] **Step 5: 提交 Task 2**
+- [x] **Step 5: 提交 Task 2**
 
 Task 2 进度 amend 到 Task 1 功能提交，不新增纯接线或进度提交；最终中文说明保持 `feat(debug): 增加 Codex 协议脱敏日志`。
 

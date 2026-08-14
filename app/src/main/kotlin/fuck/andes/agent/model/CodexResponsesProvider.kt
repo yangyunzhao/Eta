@@ -32,6 +32,7 @@ internal class CodexResponsesProvider private constructor(
     private val credentialProvider: CodexCredentialProvider,
     httpClient: OkHttpClient,
     private val endpointUrl: HttpUrl,
+    private val debugLogger: CodexProtocolDebugLogger,
 ) : AgentProviderClient {
     private val callFactory = httpClient.newBuilder()
         .followRedirects(false)
@@ -42,6 +43,7 @@ internal class CodexResponsesProvider private constructor(
         credentialProvider = credentialProvider,
         httpClient = AgentHttpClient.client,
         endpointUrl = FIXED_ENDPOINT,
+        debugLogger = CodexProtocolDebugLogger.default(),
     )
 
     override val id: String = "codex_oauth_responses"
@@ -62,20 +64,23 @@ internal class CodexResponsesProvider private constructor(
         onEvent: (ProviderEvent) -> Unit,
     ): ProviderResponse {
         validateRequest(request)
-        val body = ResponsesRequestBuilder.buildCodex(
+        val requestJson = ResponsesRequestBuilder.buildCodex(
             request.config,
             request.messages,
             request.tools,
-        ).toString()
+        )
+        val trace = debugLogger.beginRequest(request.config.model, requestJson)
+        trace.log("request_built")
+        val body = requestJson.toString()
         val firstCredential = credentialProvider.requireValidCredential(request.config.providerId)
-        return when (val firstAttempt = executeOnce(body, firstCredential, runController, onEvent)) {
+        return when (val firstAttempt = executeOnce(body, firstCredential, runController, onEvent, trace, 1)) {
             is AttemptResult.Success -> firstAttempt.response
             AttemptResult.Unauthorized -> {
                 val refreshed = credentialProvider.refreshAfterUnauthorized(
                     providerId = request.config.providerId,
                     rejectedAccessToken = firstCredential.accessToken,
                 )
-                when (val secondAttempt = executeOnce(body, refreshed, runController, onEvent)) {
+                when (val secondAttempt = executeOnce(body, refreshed, runController, onEvent, trace, 2)) {
                     is AttemptResult.Success -> secondAttempt.response
                     AttemptResult.Unauthorized -> {
                         val invalidated = credentialProvider.invalidateAfterUnauthorized(
@@ -115,6 +120,8 @@ internal class CodexResponsesProvider private constructor(
         credential: CodexOAuthCredential,
         runController: AgentRunController,
         onEvent: (ProviderEvent) -> Unit,
+        trace: CodexProtocolDebugLogger.RequestTrace,
+        attempt: Int,
     ): AttemptResult {
         val httpRequest = try {
             val accessToken = credential.accessToken.requireSafeHeaderValue(MAX_ACCESS_TOKEN_CHARS)
@@ -138,6 +145,7 @@ internal class CodexResponsesProvider private constructor(
                 .post(body.toRequestBody(null))
                 .build()
         } catch (_: IllegalArgumentException) {
+            trace.log("request_failed", JSONObject().put("failure", "invalid_header_value"), attempt)
             throw CodexResponsesException(CodexResponsesFailure.PROTOCOL_FAILURE)
         }
         val call = callFactory.newCall(httpRequest)
@@ -147,6 +155,12 @@ internal class CodexResponsesProvider private constructor(
             onEvent(ProviderEvent.RequestStarted)
             call.execute().use { response ->
                 onEvent(ProviderEvent.ResponseHeaders(response.code))
+                val contentType = response.header("Content-Type")
+                trace.log(
+                    "http_headers",
+                    JSONObject().put("status", response.code).put("content_type", contentType ?: JSONObject.NULL),
+                    attempt,
+                )
                 runController.throwIfCancelled()
                 when (response.code) {
                     401 -> return AttemptResult.Unauthorized
@@ -155,36 +169,64 @@ internal class CodexResponsesProvider private constructor(
                 if (!response.isSuccessful) {
                     throw CodexResponsesException(CodexResponsesFailure.HTTP_FAILURE)
                 }
-                val contentType = response.header("Content-Type")
                 if (contentType?.substringBefore(';')?.trim()?.lowercase() != "text/event-stream") {
+                    trace.log("content_type_mismatch", JSONObject().put("status", response.code), attempt)
                     throw CodexResponsesException(CodexResponsesFailure.PROTOCOL_FAILURE)
                 }
+                trace.log("sse_start", attempt = attempt)
                 val assistant = try {
                     ResponsesSseParser.parse(
                         stream = response.body.byteStream(),
                         runController = runController,
                         onEvent = onEvent,
+                        observer = trace.observer(attempt),
                     )
                 } catch (cancelled: AgentRunCancelledException) {
                     throw cancelled
-                } catch (_: IOException) {
+                } catch (failure: IOException) {
+                    trace.logException("request_failed", failure, attempt)
                     runCatching { runController.throwIfCancelled() }
                         .getOrElse { interruption -> throw interruption }
                     throw CodexResponsesException(CodexResponsesFailure.NETWORK_FAILURE)
-                } catch (_: Exception) {
+                } catch (failure: Exception) {
+                    trace.logException("request_failed", failure, attempt)
                     runCatching { runController.throwIfCancelled() }
                         .getOrElse { interruption -> throw interruption }
                     throw CodexResponsesException(CodexResponsesFailure.PROTOCOL_FAILURE)
                 }
+                trace.log("sse_complete", attempt = attempt)
                 onEvent(ProviderEvent.Completed(assistant.optString("finish_reason").ifBlank { null }))
                 return AttemptResult.Success(ProviderResponse(assistant))
             }
-        } catch (_: IOException) {
+        } catch (failure: IOException) {
+            trace.logException("request_failed", failure, attempt)
             runCatching { runController.throwIfCancelled() }
                 .getOrElse { interruption -> throw interruption }
             throw CodexResponsesException(CodexResponsesFailure.NETWORK_FAILURE)
         } finally {
             binding.close()
+        }
+    }
+
+    private fun CodexProtocolDebugLogger.RequestTrace.observer(
+        attempt: Int,
+    ): ResponsesSseParser.Observer = object : ResponsesSseParser.Observer {
+        override fun onFrame(index: Int, eventType: String, event: JSONObject) {
+            logJson(
+                "sse_frame",
+                JSONObject().put("frame_index", index).put("event_type", eventType).put("event", event),
+                attempt,
+            )
+        }
+
+        override fun onStage(stage: String, frameIndex: Int?, eventType: String?) {
+            log(
+                stage,
+                JSONObject()
+                    .apply { frameIndex?.let { put("frame_index", it) } }
+                    .apply { eventType?.let { put("event_type", it) } },
+                attempt,
+            )
         }
     }
 
@@ -239,11 +281,15 @@ internal class CodexResponsesProvider private constructor(
             credentialProvider: CodexCredentialProvider,
             httpClient: OkHttpClient,
             endpointUrl: HttpUrl = FIXED_ENDPOINT,
+            debugLogger: CodexProtocolDebugLogger = CodexProtocolDebugLogger(
+                enabled = false,
+                sink = { _, _ -> },
+            ),
         ): CodexResponsesProvider {
             require(endpointUrl == FIXED_ENDPOINT || endpointUrl.host in TEST_LOOPBACK_HOSTS) {
                 "Codex Responses test endpoint must be fixed or loopback"
             }
-            return CodexResponsesProvider(credentialProvider, httpClient, endpointUrl)
+            return CodexResponsesProvider(credentialProvider, httpClient, endpointUrl, debugLogger)
         }
     }
 }

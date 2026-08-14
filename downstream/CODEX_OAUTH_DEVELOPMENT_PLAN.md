@@ -73,7 +73,7 @@
 | Task 9 / Step 6 | 待人工 | 需注销并以只计数、不输出匹配行的方式检查敏感日志。 |
 | Task 9 / Step 7 | 待人工 | 需记录脱敏验收结果，任一关键项失败则阻止发布。 |
 | Task 10 / Step 1 | 进行中 | 已批准 Debug-only 详细脱敏日志方案，实施计划见 `CODEX_RESPONSES_DEBUGGING_PLAN.md`。 |
-| Task 10 / Step 2 | 待开始 | Provider/SSE 阶段接线、APK 构建与 ADB 覆盖安装尚未完成。 |
+| Task 10 / Step 2 | 进行中 | Provider/SSE 脱敏阶段接线已完成；待 APK 构建与 ADB 覆盖安装。 |
 | Task 10 / Step 3 | 待人工 | 安装后需用户发送一次固定最小文本，以脱敏日志确定真实根因。 |
 | Task 10 / Step 4 | 待开始 | 根据单一根因执行 TDD 修复、复审、重装并验证成功。 |
 
