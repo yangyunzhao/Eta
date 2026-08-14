@@ -10,6 +10,7 @@ import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ModelSource
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.ReasoningEffort
+import fuck.andes.data.model.withAuthMode
 import fuck.andes.data.provider.BuiltinProviders
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -143,12 +144,17 @@ class ProviderRepositoryTest {
                 authMode = ProviderAuthModes.CODEX_OAUTH,
             )
 
-        ProviderRepository.updateProvider(provider)
-        ProviderRepository.resetBuiltIn(provider.id)
+        try {
+            ProviderRepository.updateProvider(provider)
+            ProviderRepository.resetBuiltIn(provider.id)
 
-        val restored = ProviderRepository.providerById(provider.id)!!
-        assertEquals("sk-existing", restored.apiKey)
-        assertEquals(ProviderAuthModes.CODEX_OAUTH, restored.authMode)
+            val restored = ProviderRepository.providerById(provider.id)!!
+            assertEquals("sk-existing", restored.apiKey)
+            assertEquals(ProviderAuthModes.CODEX_OAUTH, restored.authMode)
+        } finally {
+            ProviderRepository.providerById(provider.id)
+                ?.let { ProviderRepository.updateProvider(it.withAuthMode("")) }
+        }
     }
 }
 
