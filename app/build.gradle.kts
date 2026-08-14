@@ -32,6 +32,7 @@ android {
         targetSdk = 36
         versionCode = 260
         versionName = "2.6.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -126,4 +127,6 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.room.testing)
     testImplementation(libs.robolectric)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
 }
