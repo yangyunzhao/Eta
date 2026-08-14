@@ -255,6 +255,36 @@ class CodexOAuthManagerTest {
         executor.shutdownNow()
         assertEquals(savesAtCancelReturn, store.saveCount.get())
         assertEquals(CodexLoginState.Idle, manager.loginState.value)
+        assertNull(store.load(PROVIDER_ID))
+    }
+
+    @Test
+    fun `cancel during credential commit restores previous credential`() {
+        val store = BlockingSaveCredentialStore(initialCredential = OLD_CREDENTIAL)
+        val manager = manager(
+            protocol = FakeDeviceProtocol(
+                pollResults = ArrayDeque(listOf(CodexDevicePollResult.Authorized(AUTHORIZATION_CODE))),
+            ),
+            store = store,
+            delayMillis = {},
+        )
+        store.blockNextSave()
+        manager.beginDeviceLogin(PROVIDER_ID)
+        assertTrue(store.saveStarted.await(5, TimeUnit.SECONDS))
+        val executor = Executors.newSingleThreadExecutor()
+        val cancelReturned = CountDownLatch(1)
+        executor.submit {
+            manager.cancelLogin(PROVIDER_ID)
+            cancelReturned.countDown()
+        }
+
+        assertFalse(cancelReturned.await(100, TimeUnit.MILLISECONDS))
+        store.releaseSave.countDown()
+        assertTrue(cancelReturned.await(5, TimeUnit.SECONDS))
+
+        executor.shutdownNow()
+        assertEquals(OLD_CREDENTIAL, store.load(PROVIDER_ID))
+        assertEquals(CodexLoginState.Idle, manager.loginState.value)
     }
 
     @Test
@@ -282,6 +312,39 @@ class CodexOAuthManagerTest {
         assertTrue(beginReturned.await(5, TimeUnit.SECONDS))
 
         executor.shutdownNow()
+    }
+
+    @Test
+    fun `cancelled commit rollback does not delete replacement provider login`() {
+        val store = BlockingSaveCredentialStore(initialCredential = OLD_CREDENTIAL)
+        val manager = manager(
+            protocol = FakeDeviceProtocol(
+                pollResults = ArrayDeque(listOf(CodexDevicePollResult.Authorized(AUTHORIZATION_CODE))),
+            ),
+            store = store,
+            delayMillis = {},
+        )
+        store.blockNextSave()
+        manager.beginDeviceLogin(PROVIDER_ID)
+        assertTrue(store.saveStarted.await(5, TimeUnit.SECONDS))
+        val executor = Executors.newSingleThreadExecutor()
+        val replacementStarted = CountDownLatch(1)
+        executor.submit {
+            manager.beginDeviceLogin(OTHER_PROVIDER_ID)
+            replacementStarted.countDown()
+        }
+
+        assertFalse(replacementStarted.await(100, TimeUnit.MILLISECONDS))
+        store.releaseSave.countDown()
+        assertTrue(replacementStarted.await(5, TimeUnit.SECONDS))
+        assertEquals(
+            CodexLoginState.Authorized(null),
+            awaitState(manager) { it is CodexLoginState.Authorized },
+        )
+
+        executor.shutdownNow()
+        assertEquals(OLD_CREDENTIAL, store.load(PROVIDER_ID))
+        assertEquals(CREDENTIAL, store.load(OTHER_PROVIDER_ID))
     }
 
     @Test
@@ -609,12 +672,18 @@ class CodexOAuthManagerTest {
         }
     }
 
-    private class BlockingSaveCredentialStore : CodexCredentialStore {
+    private class BlockingSaveCredentialStore(
+        initialCredential: CodexOAuthCredential? = null,
+    ) : CodexCredentialStore {
         private val values = ConcurrentHashMap<String, CodexOAuthCredential>()
         private val shouldBlock = java.util.concurrent.atomic.AtomicBoolean()
         val saveStarted = CountDownLatch(1)
         val releaseSave = CountDownLatch(1)
         val saveCount = AtomicInteger()
+
+        init {
+            if (initialCredential != null) values[PROVIDER_ID] = initialCredential
+        }
 
         fun blockNextSave() {
             shouldBlock.set(true)

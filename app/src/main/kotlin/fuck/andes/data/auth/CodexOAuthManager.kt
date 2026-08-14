@@ -4,7 +4,9 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -225,9 +227,11 @@ internal class CodexOAuthManager(
     val loginState: StateFlow<CodexLoginState> = mutableLoginState.asStateFlow()
 
     private val loginLock = Any()
+    private val beginLoginLock = Any()
     private val loginGeneration = AtomicLong()
     private var loginJob: Job? = null
     private var loginProviderId: String? = null
+    private val activeLoginSession = AtomicReference<LoginSession?>()
     private val refreshLocks = ConcurrentHashMap<String, Mutex>()
     private val providerMutationLocks = ConcurrentHashMap<String, Any>()
     private val providerEpochs = ConcurrentHashMap<String, AtomicLong>()
@@ -254,38 +258,42 @@ internal class CodexOAuthManager(
 
     fun beginDeviceLogin(providerId: String) {
         require(providerId.isNotBlank()) { "Codex OAuth provider id is required" }
-        synchronized(loginLock) {
-            loginJob?.cancel()
-            val generation = loginGeneration.incrementAndGet()
-            loginProviderId = providerId
-            mutableLoginState.value = CodexLoginState.Idle
-            loginJob = scope.launch(start = CoroutineStart.LAZY) {
-                runLogin(providerId, generation)
-            }.also(Job::start)
+        synchronized(beginLoginLock) {
+            activeLoginSession.get()?.let { cancelSession(it, publishIdle = false) }
+            synchronized(loginLock) {
+                loginJob?.cancel()
+                val generation = loginGeneration.incrementAndGet()
+                val session = LoginSession(providerId, generation)
+                activeLoginSession.set(session)
+                loginProviderId = providerId
+                mutableLoginState.value = CodexLoginState.Idle
+                val job = scope.launch(start = CoroutineStart.LAZY) {
+                    runLogin(session)
+                }
+                session.job = job
+                loginJob = job
+                job.start()
+            }
         }
     }
 
     fun cancelLogin() {
-        val job = synchronized(loginLock) {
-            loginGeneration.incrementAndGet()
-            loginProviderId = null
-            mutableLoginState.value = CodexLoginState.Idle
-            loginJob.also { loginJob = null }
+        val session = activeLoginSession.get()
+        if (session == null) {
+            synchronized(loginLock) {
+                mutableLoginState.value = CodexLoginState.Idle
+            }
+            return
         }
-        job?.cancel()
+        cancelSession(session, publishIdle = true)
     }
 
     fun cancelLogin(providerId: String): Boolean {
         validateProviderId(providerId)
-        val job = synchronized(loginLock) {
-            if (loginProviderId != providerId) return false
-            loginGeneration.incrementAndGet()
-            loginProviderId = null
-            mutableLoginState.value = CodexLoginState.Idle
-            loginJob.also { loginJob = null }
-        }
-        job?.cancel()
-        return true
+        val session = activeLoginSession.get()
+            ?.takeIf { it.providerId == providerId }
+            ?: return false
+        return cancelSession(session, publishIdle = true)
     }
 
     fun loginStateFor(providerId: String): CodexLoginState {
@@ -293,20 +301,22 @@ internal class CodexOAuthManager(
         synchronized(loginLock) {
             if (loginProviderId == providerId) return mutableLoginState.value
         }
-        return try {
-            if (credentialStore.load(providerId) == null) {
-                CodexLoginState.Idle
-            } else {
-                CodexLoginState.Authorized(accountLabel = null)
+        return synchronized(providerMutationLock(providerId)) {
+            try {
+                if (credentialStore.load(providerId) == null) {
+                    CodexLoginState.Idle
+                } else {
+                    CodexLoginState.Authorized(accountLabel = null)
+                }
+            } catch (_: Throwable) {
+                CodexLoginState.Failed(CodexAuthFailure.CREDENTIAL_STORE_FAILURE)
             }
-        } catch (_: Throwable) {
-            CodexLoginState.Failed(CodexAuthFailure.CREDENTIAL_STORE_FAILURE)
         }
     }
 
     suspend fun requireValidCredential(providerId: String): CodexOAuthCredential {
         validateProviderId(providerId)
-        val observed = loadCredential(providerId)
+        val observed = loadCredentialSnapshot(providerId).credential
         val observedAt = nowEpochMillis()
         if (!observed.expiresWithin(REFRESH_WINDOW_MILLIS, observedAt) ||
             wasRecentlyRefreshed(providerId, observed, observedAt)
@@ -398,35 +408,41 @@ internal class CodexOAuthManager(
         }
     }
 
-    private suspend fun runLogin(providerId: String, generation: Long) {
+    private suspend fun runLogin(session: LoginSession) {
         try {
             withTimeout(loginTimeoutMillis) {
                 when (val authorization = deviceAuthProtocol.requestAuthorization()) {
                     is CodexDeviceAuthorizationResult.Failure -> {
-                        publish(generation, CodexLoginState.Failed(authorization.reason.toManagerFailure()))
+                        publish(
+                            session.generation,
+                            CodexLoginState.Failed(authorization.reason.toManagerFailure()),
+                        )
                     }
 
                     is CodexDeviceAuthorizationResult.Success -> {
                         publish(
-                            generation,
+                            session.generation,
                             CodexLoginState.AwaitingUser(
                                 userCode = authorization.authorization.userCode,
                                 verificationUrl = VERIFICATION_URL,
                             ),
                         )
-                        pollUntilComplete(providerId, generation, authorization.authorization)
+                        pollUntilComplete(session, authorization.authorization)
                     }
                 }
             }
         } catch (_: TimeoutCancellationException) {
-            publish(generation, CodexLoginState.Failed(CodexAuthFailure.TIMEOUT))
+            publish(session.generation, CodexLoginState.Failed(CodexAuthFailure.TIMEOUT))
         } catch (_: CancellationException) {
-            publish(generation, CodexLoginState.Idle)
+            publish(session.generation, CodexLoginState.Idle)
         } catch (_: Throwable) {
-            publish(generation, CodexLoginState.Failed(CodexAuthFailure.CREDENTIAL_STORE_FAILURE))
+            publish(
+                session.generation,
+                CodexLoginState.Failed(CodexAuthFailure.CREDENTIAL_STORE_FAILURE),
+            )
         } finally {
             synchronized(loginLock) {
-                if (loginGeneration.get() == generation) {
+                if (activeLoginSession.compareAndSet(session, null)) {
                     loginJob = null
                     loginProviderId = null
                 }
@@ -435,8 +451,7 @@ internal class CodexOAuthManager(
     }
 
     private suspend fun pollUntilComplete(
-        providerId: String,
-        generation: Long,
+        session: LoginSession,
         authorization: CodexDeviceAuthorization,
     ) {
         while (true) {
@@ -444,12 +459,15 @@ internal class CodexOAuthManager(
             when (val poll = deviceAuthProtocol.pollOnce(authorization)) {
                 CodexDevicePollResult.Pending -> Unit
                 is CodexDevicePollResult.Failure -> {
-                    publish(generation, CodexLoginState.Failed(poll.reason.toManagerFailure()))
+                    publish(
+                        session.generation,
+                        CodexLoginState.Failed(poll.reason.toManagerFailure()),
+                    )
                     return
                 }
 
                 is CodexDevicePollResult.Authorized -> {
-                    exchangeAndSave(providerId, generation, poll.code)
+                    exchangeAndSave(session, poll.code)
                     return
                 }
             }
@@ -457,36 +475,48 @@ internal class CodexOAuthManager(
     }
 
     private suspend fun exchangeAndSave(
-        providerId: String,
-        generation: Long,
+        session: LoginSession,
         code: CodexAuthorizationCode,
     ) {
         when (val result = deviceAuthProtocol.exchangeToken(code)) {
             is CodexTokenResult.Failure -> {
-                publish(generation, CodexLoginState.Failed(result.reason.toManagerFailure()))
+                publish(
+                    session.generation,
+                    CodexLoginState.Failed(result.reason.toManagerFailure()),
+                )
             }
 
             is CodexTokenResult.Success -> {
                 val tokens = result.tokens
-                synchronized(providerMutationLock(providerId)) {
+                synchronized(providerMutationLock(session.providerId)) {
                     synchronized(loginLock) {
-                        if (loginGeneration.get() != generation ||
-                            loginProviderId != providerId
+                        if (activeLoginSession.get() !== session ||
+                            loginGeneration.get() != session.generation ||
+                            loginProviderId != session.providerId ||
+                            session.cancelRequested.get()
                         ) {
                             return
                         }
-                        credentialStore.save(
-                            providerId,
-                            CodexOAuthCredential(
-                                accessToken = tokens.accessToken,
-                                refreshToken = tokens.refreshToken,
-                                idToken = tokens.idToken,
-                                accountId = tokens.accountId,
-                                expiresAtEpochMillis = tokens.expiresAtEpochMillis,
-                            ),
+                        val previousCredential = credentialStore.load(session.providerId)
+                        val committedCredential = CodexOAuthCredential(
+                            accessToken = tokens.accessToken,
+                            refreshToken = tokens.refreshToken,
+                            idToken = tokens.idToken,
+                            accountId = tokens.accountId,
+                            expiresAtEpochMillis = tokens.expiresAtEpochMillis,
                         )
-                        providerEpoch(providerId).incrementAndGet()
-                        recentRefreshes.remove(providerId)
+                        credentialStore.save(
+                            session.providerId,
+                            committedCredential,
+                        )
+                        session.previousCredential = previousCredential
+                        session.committedCredential = committedCredential
+                        if (session.cancelRequested.get()) {
+                            restoreCancelledLogin(session)
+                            return
+                        }
+                        providerEpoch(session.providerId).incrementAndGet()
+                        recentRefreshes.remove(session.providerId)
                         mutableLoginState.value = CodexLoginState.Authorized(accountLabel = null)
                     }
                 }
@@ -573,6 +603,51 @@ internal class CodexOAuthManager(
             )
         }
 
+    private fun cancelSession(session: LoginSession, publishIdle: Boolean): Boolean {
+        session.cancelRequested.set(true)
+        val wasCurrent = activeLoginSession.get() === session
+        synchronized(providerMutationLock(session.providerId)) {
+            synchronized(loginLock) {
+                try {
+                    restoreCancelledLogin(session)
+                } catch (_: Throwable) {
+                    throw CodexAuthException(CodexAuthFailure.CREDENTIAL_STORE_FAILURE)
+                }
+                when (val current = activeLoginSession.get()) {
+                    session -> {
+                        activeLoginSession.set(null)
+                        loginGeneration.incrementAndGet()
+                        loginProviderId = null
+                        loginJob = null
+                        if (publishIdle) mutableLoginState.value = CodexLoginState.Idle
+                    }
+
+                    null -> if (publishIdle) mutableLoginState.value = CodexLoginState.Idle
+                    else -> Unit
+                }
+            }
+        }
+        session.job?.cancel()
+        return wasCurrent
+    }
+
+    private fun restoreCancelledLogin(session: LoginSession) {
+        val committed = session.committedCredential ?: return
+        val current = credentialStore.load(session.providerId)
+        if (current == committed) {
+            val previous = session.previousCredential
+            if (previous == null) {
+                credentialStore.clear(session.providerId)
+            } else {
+                credentialStore.save(session.providerId, previous)
+            }
+            providerEpoch(session.providerId).incrementAndGet()
+            recentRefreshes.remove(session.providerId)
+        }
+        session.previousCredential = null
+        session.committedCredential = null
+    }
+
     private fun refreshLock(providerId: String): Mutex =
         refreshLocks.computeIfAbsent(providerId) { Mutex() }
 
@@ -584,7 +659,10 @@ internal class CodexOAuthManager(
 
     private fun publish(generation: Long, state: CodexLoginState) {
         synchronized(loginLock) {
-            if (loginGeneration.get() == generation) mutableLoginState.value = state
+            val session = activeLoginSession.get()
+            if (session?.generation == generation && !session.cancelRequested.get()) {
+                mutableLoginState.value = state
+            }
         }
     }
 
@@ -639,6 +717,20 @@ internal class CodexOAuthManager(
     ) {
         override fun toString(): String =
             "RefreshStamp(accessToken=<redacted>, refreshedAtEpochMillis=$refreshedAtEpochMillis)"
+    }
+
+    private class LoginSession(
+        val providerId: String,
+        val generation: Long,
+    ) {
+        val cancelRequested = AtomicBoolean()
+        @Volatile
+        var job: Job? = null
+        var previousCredential: CodexOAuthCredential? = null
+        var committedCredential: CodexOAuthCredential? = null
+
+        override fun toString(): String =
+            "LoginSession(providerId=$providerId, generation=$generation, credential=<redacted>)"
     }
 }
 
