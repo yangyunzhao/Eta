@@ -9,6 +9,7 @@ import fuck.andes.data.model.CustomProviderSetting
 import fuck.andes.data.model.Model
 import fuck.andes.data.model.OpenAiCompatibleProviderSetting
 import fuck.andes.data.model.OpenAiEndpointMode
+import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.data.model.runtimeProviderType
@@ -108,7 +109,11 @@ internal object RuntimeConfigRepository {
             providerType = provider.runtimeProviderType,
             providerSourceType = sourceType,
             baseUrl = provider.baseUrl.trim(),
-            apiKey = provider.apiKey.trim(),
+            apiKey = if (provider.authMode == ProviderAuthModes.CODEX_OAUTH) {
+                ""
+            } else {
+                provider.apiKey.trim()
+            },
             model = model.modelId.trim(),
             modelDisplayName = model.displayName.trim(),
             contextWindow = model.contextWindow,
@@ -123,6 +128,7 @@ internal object RuntimeConfigRepository {
             reasoningCapabilities = reasoningCapabilities,
             customHeaders = provider.customHeaders + model.customHeaders,
             customBody = provider.customBody + model.customBody,
+            authMode = provider.authMode,
         )
     }
 

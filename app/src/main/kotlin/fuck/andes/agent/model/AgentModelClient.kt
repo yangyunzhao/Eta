@@ -11,6 +11,8 @@ import fuck.andes.data.model.CustomBody
 import fuck.andes.data.model.CustomHeader
 import fuck.andes.data.model.OpenAiEndpointMode
 import fuck.andes.data.model.ModelReasoningCapabilities
+import fuck.andes.data.model.ProviderAuthModes
+import fuck.andes.data.model.ProviderSourceTypes
 import fuck.andes.data.model.ProviderTypes
 import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.data.provider.BuiltinProviders
@@ -91,7 +93,7 @@ internal object AgentModelClient {
         memoryContext: AgentMemoryContext = AgentMemoryContext.DISABLED,
         onEvent: (AgentEvent) -> Unit = {}
     ): ModelResponse.Text {
-        config.validate()
+        config.validateForTest()
         val messages = AgentPromptBuilder.buildInitialMessages(
             config,
             prompt,
@@ -155,22 +157,6 @@ internal object AgentModelClient {
         )
     }
 
-    private fun ModelConfig.validate() {
-        require(baseUrl.isNotBlank()) { "请先配置 API 地址" }
-        require(apiKey.isNotBlank()) { "请先配置 API Key" }
-        require(model.isNotBlank()) { "请先配置模型名" }
-        require(
-            reasoningCapabilities?.mandatory != true ||
-                effectiveReasoningEffort != ReasoningEffort.OFF
-        ) { "当前模型强制启用推理，不能选择 Off 或禁用思考权限" }
-        if (extraBodyJson.isNotBlank()) {
-            runCatching { JSONObject(extraBodyJson) }
-                .getOrElse { throwable ->
-                    error("额外请求体 JSON 无效：${throwable.message ?: throwable.javaClass.simpleName}")
-                }
-        }
-    }
-
     fun buildUserHistoryMessage(
         text: String,
         images: List<ModelImage>,
@@ -211,10 +197,50 @@ internal object AgentModelClient {
         val reasoningCapabilities: ModelReasoningCapabilities? = null,
         val extraBodyJson: String = "",
         val customHeaders: List<CustomHeader> = emptyList(),
-        val customBody: List<CustomBody> = emptyList()
+        val customBody: List<CustomBody> = emptyList(),
+        val authMode: String = "",
     ) {
         val effectiveReasoningEffort: ReasoningEffort
             get() = reasoningEffort ?: ReasoningEffort.fromLegacy(thinkingEnabled)
+
+        internal fun validateForTest() {
+            when (authMode) {
+                "" -> {
+                    require(baseUrl.isNotBlank()) { "请先配置 API 地址" }
+                    require(apiKey.isNotBlank()) { "请先配置 API Key" }
+                    require(model.isNotBlank()) { "请先配置模型名" }
+                }
+
+                ProviderAuthModes.CODEX_OAUTH -> {
+                    require(providerId == BuiltinProviders.OPENAI_ID) {
+                        "Codex OAuth 仅支持内置 OpenAI Provider"
+                    }
+                    require(providerType == ProviderTypes.OPENAI_COMPATIBLE) {
+                        "Codex OAuth 仅支持 OpenAI-compatible Provider"
+                    }
+                    require(providerSourceType == ProviderSourceTypes.OPENAI) {
+                        "Codex OAuth 仅支持 OpenAI Provider 来源"
+                    }
+                    require(openAiEndpointMode == OpenAiEndpointMode.RESPONSES) {
+                        "Codex OAuth 仅支持 Responses endpoint"
+                    }
+                    require(apiKey.isBlank()) { "Codex OAuth 配置禁止携带 API Key" }
+                    require(model.isNotBlank()) { "请先配置模型名" }
+                }
+
+                else -> throw IllegalArgumentException("不支持的认证模式")
+            }
+            require(
+                reasoningCapabilities?.mandatory != true ||
+                    effectiveReasoningEffort != ReasoningEffort.OFF
+            ) { "当前模型强制启用推理，不能选择 Off 或禁用思考权限" }
+            if (extraBodyJson.isNotBlank()) {
+                runCatching { JSONObject(extraBodyJson) }
+                    .getOrElse { throwable ->
+                        error("额外请求体 JSON 无效：${throwable.message ?: throwable.javaClass.simpleName}")
+                    }
+            }
+        }
     }
 
     @Serializable

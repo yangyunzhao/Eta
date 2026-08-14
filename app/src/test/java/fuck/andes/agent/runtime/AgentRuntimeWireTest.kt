@@ -6,7 +6,12 @@ import android.util.Base64
 import fuck.andes.agent.media.AgentImageCodec
 import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.data.model.ModelReasoningCapabilities
+import fuck.andes.data.model.OpenAiEndpointMode
+import fuck.andes.data.model.ProviderAuthModes
+import fuck.andes.data.model.ProviderSourceTypes
+import fuck.andes.data.model.ProviderTypes
 import fuck.andes.data.model.ReasoningEffort
+import fuck.andes.data.provider.BuiltinProviders
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.serialization.json.Json
@@ -266,6 +271,65 @@ class AgentRuntimeWireTest {
         assertEquals(request, roundTripped)
         assertEquals(262_144, roundTripped.config.contextWindow)
         assertEquals(ReasoningEffort.HIGH, roundTripped.config.reasoningEffort)
+    }
+
+    @Test
+    fun codexOAuthConfigRoundTripsWithoutCredentialFields() {
+        val request = AgentRuntimeWire.RunRequest(
+            runId = "run-codex-oauth",
+            prompt = "continue",
+            config = AgentModelClient.ModelConfig(
+                providerId = BuiltinProviders.OPENAI_ID,
+                providerName = "OpenAI",
+                providerType = ProviderTypes.OPENAI_COMPATIBLE,
+                providerSourceType = ProviderSourceTypes.OPENAI,
+                baseUrl = "https://api.openai.com/v1",
+                apiKey = "oauth-api-key-must-not-cross-binder",
+                model = "gpt-5.5",
+                systemPrompt = "system",
+                openAiEndpointMode = OpenAiEndpointMode.RESPONSES,
+                authMode = ProviderAuthModes.CODEX_OAUTH,
+            ),
+            images = emptyList(),
+        )
+
+        listOf(
+            AgentRuntimeWire.toLegacyBundle(request),
+            AgentRuntimeWire.toBundle(request, emptyList()),
+        ).forEach { bundle ->
+            val config = AgentRuntimeWire.runRequestFromBundle(bundle).config
+            assertEquals(ProviderAuthModes.CODEX_OAUTH, config.authMode)
+            assertEquals("", config.apiKey)
+            assertEquals(ProviderAuthModes.CODEX_OAUTH, bundle.getString("auth_mode"))
+            listOf(
+                "access_token",
+                "refresh_token",
+                "id_token",
+                "account_id",
+                "device_code",
+                "pkce",
+            ).forEach { forbiddenKey -> assertEquals(false, bundle.containsKey(forbiddenKey)) }
+        }
+    }
+
+    @Test
+    fun legacyRunRequestBundleDefaultsAuthModeToEmpty() {
+        val request = AgentRuntimeWire.RunRequest(
+            runId = "run-legacy-auth",
+            prompt = "continue",
+            config = AgentModelClient.ModelConfig(
+                baseUrl = "https://api.openai.com/v1",
+                apiKey = "test-key",
+                model = "gpt-test",
+                systemPrompt = "system",
+            ),
+            images = emptyList(),
+        )
+        val bundle = AgentRuntimeWire.toLegacyBundle(request).apply {
+            remove("auth_mode")
+        }
+
+        assertEquals("", AgentRuntimeWire.runRequestFromBundle(bundle).config.authMode)
     }
 
     @Test
