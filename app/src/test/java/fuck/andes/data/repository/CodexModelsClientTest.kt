@@ -5,6 +5,7 @@ import fuck.andes.data.auth.CodexAuthFailure
 import fuck.andes.data.auth.CodexCredentialProvider
 import fuck.andes.data.auth.CodexOAuthCredential
 import fuck.andes.data.auth.CODEX_PROTOCOL_COMPAT_VERSION
+import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -37,7 +38,7 @@ class CodexModelsClientTest {
         val models = client.fetch("provider-id")
 
         assertEquals(listOf("gpt-test"), models.map { it.modelId })
-        val request = server.takeRequest()
+        val request = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
         assertEquals("/models?client_version=0.147.0", request.target)
         assertEquals("Bearer access-current", request.headers["Authorization"])
         assertEquals("account-current", request.headers["ChatGPT-Account-ID"])
@@ -58,8 +59,14 @@ class CodexModelsClientTest {
         assertEquals(listOf("gpt-test"), models.map { it.modelId })
         assertEquals(1, credentialProvider.refreshCount)
         assertEquals(0, credentialProvider.invalidateCount)
-        assertEquals("Bearer access-old", server.takeRequest().headers["Authorization"])
-        assertEquals("Bearer access-new", server.takeRequest().headers["Authorization"])
+        assertEquals(
+            "Bearer access-old",
+            requireNotNull(server.takeRequest(5, TimeUnit.SECONDS)).headers["Authorization"],
+        )
+        assertEquals(
+            "Bearer access-new",
+            requireNotNull(server.takeRequest(5, TimeUnit.SECONDS)).headers["Authorization"],
+        )
     }
 
     @Test

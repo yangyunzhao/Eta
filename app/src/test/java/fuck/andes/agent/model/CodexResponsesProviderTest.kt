@@ -271,10 +271,10 @@ class CodexResponsesProviderTest {
         val response = provider(credentials).complete(basicRequest(), AgentRunController())
 
         assertEquals("ok", response.assistantMessage.getString("content"))
-        val firstRequest = requireNotNull(server.takeRequest())
+        val firstRequest = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
         assertEquals("Bearer access-one", firstRequest.headers["Authorization"])
         assertEquals(null, firstRequest.headers["ChatGPT-Account-ID"])
-        val retriedRequest = requireNotNull(server.takeRequest())
+        val retriedRequest = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
         assertEquals("Bearer access-two", retriedRequest.headers["Authorization"])
         assertEquals(null, retriedRequest.headers["ChatGPT-Account-ID"])
         assertEquals(1, credentials.refreshCount)

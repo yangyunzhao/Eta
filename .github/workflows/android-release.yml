@@ -55,10 +55,16 @@ jobs:
             exit 1
           fi
 
-      - name: 运行完整单元测试与 Lint
+      - name: 运行完整单元测试
+        run: >-
+          timeout --signal=TERM --kill-after=30s 15m
+          ./gradlew --no-daemon --no-configuration-cache
+          :app:testDebugUnitTest
+
+      - name: 运行 Android Lint
         run: >-
           ./gradlew --no-daemon --no-configuration-cache
-          :app:test :app:lint
+          :app:lint
 
       - name: 还原发布证书
         env:

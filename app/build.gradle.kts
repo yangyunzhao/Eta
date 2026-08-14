@@ -1,4 +1,7 @@
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestListener
+import org.gradle.api.tasks.testing.TestResult
 
 plugins {
     alias(libs.plugins.android.application)
@@ -63,6 +66,27 @@ tasks.withType<Test>().configureEach {
     systemProperty("eta.test.upstreamVersionName", upstreamVersionName)
     systemProperty("eta.test.upstreamVersionCode", upstreamVersionCode)
     systemProperty("eta.test.downstreamReleaseSequence", downstreamReleaseSequence)
+
+    if (providers.environmentVariable("CI").isPresent) {
+        maxParallelForks = 1
+        addTestListener(
+            object : TestListener {
+                override fun beforeSuite(suite: TestDescriptor) = Unit
+
+                override fun afterSuite(suite: TestDescriptor, result: TestResult) = Unit
+
+                override fun beforeTest(descriptor: TestDescriptor) {
+                    logger.lifecycle("ETA_TEST_START ${descriptor.className}.${descriptor.name}")
+                }
+
+                override fun afterTest(descriptor: TestDescriptor, result: TestResult) {
+                    logger.lifecycle(
+                        "ETA_TEST_END ${descriptor.className}.${descriptor.name} ${result.resultType}",
+                    )
+                }
+            },
+        )
+    }
 }
 
 java {
