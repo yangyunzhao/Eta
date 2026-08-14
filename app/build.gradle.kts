@@ -28,11 +28,41 @@ val codexOAuthEnabled = rawCodexOAuthBuildProperty
     }
     .orElse(true)
 
+val upstreamVersionName = "2.6.0"
+val upstreamVersionCode = 260
+val downstreamReleaseSequence = 1
+val downstreamVersionLabel = "znmlr"
+val downstreamVersionCodeMultiplier = 100
+val maxDownstreamReleaseSequence = downstreamVersionCodeMultiplier - 1
+val maxAndroidVersionCode = 2_100_000_000
+
+require(Regex("""\d+\.\d+\.\d+""").matches(upstreamVersionName)) {
+    "upstreamVersionName must contain exactly three numeric components"
+}
+require(upstreamVersionCode > 0) {
+    "upstreamVersionCode must be positive"
+}
+require(downstreamReleaseSequence in 1..maxDownstreamReleaseSequence) {
+    "downstreamReleaseSequence must be between 1 and $maxDownstreamReleaseSequence"
+}
+
+val downstreamVersionName =
+    "$upstreamVersionName.$downstreamVersionLabel.$downstreamReleaseSequence"
+val downstreamVersionCodeLong =
+    upstreamVersionCode.toLong() * downstreamVersionCodeMultiplier + downstreamReleaseSequence
+require(downstreamVersionCodeLong <= maxAndroidVersionCode) {
+    "computed downstream versionCode exceeds Android's supported maximum"
+}
+val downstreamVersionCode = downstreamVersionCodeLong.toInt()
+
 tasks.withType<Test>().configureEach {
     systemProperty(
         "eta.test.codexOAuthBuildProperty",
         rawCodexOAuthBuildProperty.orElse("<unset>").get(),
     )
+    systemProperty("eta.test.upstreamVersionName", upstreamVersionName)
+    systemProperty("eta.test.upstreamVersionCode", upstreamVersionCode)
+    systemProperty("eta.test.downstreamReleaseSequence", downstreamReleaseSequence)
 }
 
 java {
@@ -49,8 +79,8 @@ android {
         applicationId = "fuck.andes"
         minSdk = 34
         targetSdk = 36
-        versionCode = 260
-        versionName = "2.6.0"
+        versionCode = downstreamVersionCode
+        versionName = downstreamVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "boolean",
