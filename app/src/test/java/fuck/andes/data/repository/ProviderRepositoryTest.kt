@@ -10,7 +10,6 @@ import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ModelSource
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.ReasoningEffort
-import fuck.andes.data.model.withAuthMode
 import fuck.andes.data.provider.BuiltinProviders
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -138,7 +137,8 @@ class ProviderRepositoryTest {
     @Test
     fun resettingBuiltInProviderPreservesItsSelectedAuthMode() = runBlocking {
         ProviderRepository.ensureBuiltInsMerged()
-        val provider = (ProviderRepository.providerById(BuiltinProviders.OPENAI_ID) as OpenAiCompatibleProviderSetting)
+        val original = requireNotNull(ProviderRepository.providerById(BuiltinProviders.OPENAI_ID))
+        val provider = (original as OpenAiCompatibleProviderSetting)
             .copy(
                 apiKey = "sk-existing",
                 authMode = ProviderAuthModes.CODEX_OAUTH,
@@ -152,8 +152,7 @@ class ProviderRepositoryTest {
             assertEquals("sk-existing", restored.apiKey)
             assertEquals(ProviderAuthModes.CODEX_OAUTH, restored.authMode)
         } finally {
-            ProviderRepository.providerById(provider.id)
-                ?.let { ProviderRepository.updateProvider(it.withAuthMode("")) }
+            ProviderRepository.updateProvider(original)
         }
     }
 }
