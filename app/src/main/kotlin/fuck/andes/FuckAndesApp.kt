@@ -7,6 +7,11 @@ import fuck.andes.agent.skill.SkillRuntime
 import fuck.andes.config.Prefs
 import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.core.safeLogType
+import fuck.andes.data.auth.AndroidCodexCredentialStore
+import fuck.andes.data.auth.CodexCredentialProvider
+import fuck.andes.data.auth.CodexDeviceAuthClient
+import fuck.andes.data.auth.CodexOAuthManager
+import fuck.andes.data.auth.CodexTokenRefreshClient
 import fuck.andes.data.datastore.SettingsDataStore
 import fuck.andes.data.repository.ProviderRepository
 import fuck.andes.data.repository.AgentMemoryRepository
@@ -43,6 +48,14 @@ class FuckAndesApp : Application(), XposedServiceHelper.OnServiceListener {
         SettingsDataStore.init(this)
         AgentMemoryRepository.init(this)
         ProviderRepository.init(this)
+        val oauthManager = CodexOAuthManager(
+            deviceAuthProtocol = CodexDeviceAuthClient(),
+            credentialStore = AndroidCodexCredentialStore(this),
+            refreshProtocol = CodexTokenRefreshClient(),
+            scope = applicationScope,
+        )
+        codexOAuthManager = oauthManager
+        codexCredentialProvider = oauthManager.credentialProvider
         XposedServiceHelper.registerListener(this)
         applicationScope.launch {
             runCatching {
@@ -74,6 +87,18 @@ class FuckAndesApp : Application(), XposedServiceHelper.OnServiceListener {
         @Volatile
         var serviceInstance: XposedService? = null
             private set
+
+        @Volatile
+        private var codexOAuthManager: CodexOAuthManager? = null
+
+        @Volatile
+        private var codexCredentialProvider: CodexCredentialProvider? = null
+
+        internal fun requireCodexOAuthManager(): CodexOAuthManager =
+            checkNotNull(codexOAuthManager) { "Codex OAuth runtime is not initialized" }
+
+        internal fun requireCodexCredentialProvider(): CodexCredentialProvider =
+            checkNotNull(codexCredentialProvider) { "Codex OAuth runtime is not initialized" }
 
         private val listeners = CopyOnWriteArraySet<ServiceStateListener>()
         private val mainHandler = Handler(Looper.getMainLooper())

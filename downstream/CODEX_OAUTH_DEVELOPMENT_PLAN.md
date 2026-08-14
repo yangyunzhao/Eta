@@ -39,11 +39,11 @@
 | Task 3 / Step 4 | 已完成 | 真实 AndroidKeyStore instrumentation 测试源码已增加，已编译并打包测试 APK。 |
 | Task 3 / Step 5 | 部分完成 | JVM 定向测试 8/8 通过；无连接设备，`connectedDebugAndroidTest` 未运行，真实 AndroidKeyStore 行为尚待验证。 |
 | Task 3 / Step 6 | 已完成 | 加密凭据与清理加固检查点已提交并整合，独立安全复审 APPROVED。 |
-| Task 4 / Step 1 | 进行中 | Task 4 已启动；尚无完成报告或可勾选证据。 |
-| Task 4 / Step 2 | 未开始 | 待 Step 1 的失败测试就绪后执行。 |
-| Task 4 / Step 3 | 未开始 | 待实现状态机和 single-flight。 |
-| Task 4 / Step 4 | 未开始 | 待运行 Manager 定向测试。 |
-| Task 4 / Step 5 | 未开始 | 待完成并提交独立检查点。 |
+| Task 4 / Step 1 | 已完成 | 已新增状态机、15 分钟超时、取消、刷新窗口、并发 single-flight、401、rotation、失败分类和脱敏测试。 |
+| Task 4 / Step 2 | 已完成 | Manager 与 refresh 契约尚不存在，定向测试在编译阶段按预期失败，RED 证据已记录。 |
+| Task 4 / Step 3 | 已完成 | 已统一登录 ownership、凭据保存和状态写入的线性化临界区，并实现状态机、single-flight 与 compare-and-clear。 |
+| Task 4 / Step 4 | 已完成 | Fresh 联合定向 47/47；独立二审 APPROVED；全量 610 项仍仅同一 8 个基线失败。 |
+| Task 4 / Step 5 | 已完成 | 独立二审 APPROVED，登录生命周期代码已用中文提交为独立检查点。 |
 | Task 5 / Step 1 | 已完成 | 已增加 Runtime 配置验证与 Wire 脱敏失败测试；Factory 分流已调整至 Task 6。 |
 | Task 5 / Step 2 | 已完成 | RED 证据包括缺少 `authMode` 以及 Wire 误传 OAuth API Key。 |
 | Task 5 / Step 3 | 已完成 | `ModelConfig` 条件验证、Runtime 投影和 Binder 二次清空已实现。 |
@@ -276,17 +276,17 @@ git commit -m "feat(auth): 加密存储 Codex OAuth 凭据"
 - Produces: `beginDeviceLogin(providerId)`、`cancelLogin()`、`requireValidCredential(providerId)`、`logout(providerId)`。
 - Consumes: Task 2 的协议 Client 和 Task 3 的凭据仓库。
 
-- [ ] **Step 1: 写状态机和并发刷新失败测试**
+- [x] **Step 1: 写状态机和并发刷新失败测试**
 
 覆盖 `Idle -> AwaitingUser -> Authorized`、15 分钟超时、取消、失败不覆盖旧凭据、到期前 60 秒刷新、十个并发请求只刷新一次、invalid grant 清理、网络失败保留凭据。
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexOAuthManagerTest'`
 
 Expected: FAIL，Manager 尚不存在。
 
-- [ ] **Step 3: 实现状态机和 single-flight**
+- [x] **Step 3: 实现状态机和 single-flight**
 
 ```kotlin
 internal sealed interface CodexLoginState {
@@ -299,13 +299,13 @@ internal sealed interface CodexLoginState {
 
 登录使用可取消协程；刷新使用每个 provider 独立的锁。`FuckAndesApp.onCreate()` 初始化生产 store 和 manager，token 不写入 RemotePreferences。
 
-- [ ] **Step 4: 运行测试并确认通过**
+- [x] **Step 4: 运行测试并确认通过**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexOAuthManagerTest'`
 
 Expected: PASS；并发刷新计数严格为 1。
 
-- [ ] **Step 5: 提交独立检查点**
+- [x] **Step 5: 提交独立检查点**
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/data/auth/CodexOAuthManager.kt app/src/test/java/fuck/andes/data/auth/CodexOAuthManagerTest.kt app/src/main/kotlin/fuck/andes/FuckAndesApp.kt
