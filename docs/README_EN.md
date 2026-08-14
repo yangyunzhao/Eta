@@ -21,15 +21,15 @@ And when photos, notifications, calendars, notes, recordings, location, and heal
 
 |                         GUI agent                          |                   Breeno BYOK from the power button                    |
 | :--------------------------------------------------------: | :--------------------------------------------------------------------: |
-| <img src="docs/Screenshots/demo_gui_agent.gif" width="320" alt="Eta operating an Android app through the GUI"> | <img src="docs/Screenshots/demo_tools.gif" width="320" alt="Starting Eta through Breeno and running tools"> |
+| <img src="Screenshots/demo_gui_agent.gif" width="320" alt="Eta operating an Android app through the GUI"> | <img src="Screenshots/demo_tools.gif" width="320" alt="Starting Eta through Breeno and running tools"> |
 
 |                  Chat workspace                   |                         Shell from Breeno                          |                    Native device tools                     |
 | :-----------------------------------------------: | :----------------------------------------------------------------: | :--------------------------------------------------------: |
-| ![Eta chat workspace](docs/Screenshots/chat_home.jpg) | ![Running a shell command from Breeno](docs/Screenshots/chat_breeno_analysis.jpg) | ![Calling native Android capabilities](docs/Screenshots/chat_device_direct.jpg) |
+| ![Eta chat workspace](Screenshots/chat_home.jpg) | ![Running a shell command from Breeno](Screenshots/chat_breeno_analysis.jpg) | ![Calling native Android capabilities](Screenshots/chat_device_direct.jpg) |
 
 |                    Settings                     |                    Tool controls                    |                Skills                 |
 | :---------------------------------------------: | :-------------------------------------------------: | :-----------------------------------: |
-| ![Eta settings](docs/Screenshots/settings.jpg) | ![Eta tool controls](docs/Screenshots/tools.jpg) | ![Eta Skills](docs/Screenshots/skills.jpg) |
+| ![Eta settings](Screenshots/settings.jpg) | ![Eta tool controls](Screenshots/tools.jpg) | ![Eta Skills](Screenshots/skills.jpg) |
 
 ## From a request to a result
 
@@ -151,7 +151,7 @@ Eta's capabilities depend heavily on the model you connect.
 
 - **Protocols:** OpenAI-compatible Chat Completions and the Anthropic Messages API, with Server-Sent Events (SSE), streamed tool calls, image input, and reasoning content.
 - **Built-in providers:** OpenAI, Anthropic, Alibaba Cloud Model Studio, DeepSeek, Kimi, Xiaomi MiMo, MiniMax, StepFun, SiliconFlow, and OpenRouter.
-- **Provider identity:** known providers use bundled full-color brand icons; unknown and custom endpoints retain a generic icon. Sources and licenses are listed in the [third-party notices](docs/THIRD_PARTY_NOTICES.md).
+- **Provider identity:** known providers use bundled full-color brand icons; unknown and custom endpoints retain a generic icon. Sources and licenses are listed in the [third-party notices](THIRD_PARTY_NOTICES.md).
 - **Custom providers:** configure an HTTP or HTTPS base URL, API key, headers, and body JSON. Plain HTTP transmits the API key, prompts, and model content without transport encryption.
 - **Model management:** use bundled official catalogs, synchronize remote model lists, or add models manually. Remote synchronization updates remote entries without deleting manual ones. Capability metadata returned explicitly by `/models` takes precedence; bundled provider catalogs fill only missing metadata, and presets remain isolated by provider.
 - **Conversation drafts:** a new conversation remains a local draft until its first message is sent.
@@ -290,7 +290,7 @@ Eta is exploring the part of this direction that can be built today within Andro
 
 ## Project layout
 
-Core code lives under `app/src/main/kotlin/fuck/andes/`:
+Core code lives under `../app/src/main/kotlin/fuck/andes/`:
 
 ```text
 ModuleMain.kt              libxposed module entry point
@@ -327,7 +327,7 @@ systemizer/                Google App systemizer installer
 config/Prefs.kt            RemotePreferences configuration
 ```
 
-See [Agent Runtime](docs/AGENT_RUNTIME.md) for loop, tool-batch, steering, and transcript semantics. See [Technical Implementation](docs/TECHNICAL.md) for personal-data tools, file vision, Gemini, Circle to Search, and RemotePreferences internals. These technical documents are currently maintained in Chinese.
+See [Agent Runtime](AGENT_RUNTIME.md) for loop, tool-batch, steering, and transcript semantics. See [Technical Implementation](TECHNICAL.md) for personal-data tools, file vision, Gemini, Circle to Search, and RemotePreferences internals. These technical documents are currently maintained in Chinese.
 
 ## References and acknowledgements
 
@@ -338,11 +338,11 @@ Eta implements these ideas independently around its own Xposed entry points, And
 
 ## License
 
-Eta's source code is available for personal learning, research, modification, and noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+Eta's source code is available for personal learning, research, modification, and noncommercial use under the [PolyForm Noncommercial License 1.0.0](../LICENSE).
 
 Without written permission from the author, you may not sell the project, its source code, APK, or modified versions, or use it for paid distribution, paid installation, or other commercial services. For commercial licensing, contact [Mangi (Mangi-11)](https://github.com/Mangi-11) through GitHub.
 
-Third-party dependencies, icons, and brand assets remain under their respective licenses and are not relicensed by Eta. See the [third-party notices](docs/THIRD_PARTY_NOTICES.md).
+Third-party dependencies, icons, and brand assets remain under their respective licenses and are not relicensed by Eta. See the [third-party notices](THIRD_PARTY_NOTICES.md).
 
 To keep commercial licensing possible under a single grant, external code contributions can be merged only after a Contributor License Agreement process has been established. Until then, suggestions and bug reports are welcome through Issues.
 
