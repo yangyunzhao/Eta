@@ -62,7 +62,7 @@
 | Task 7 / Step 5 | 已完成 | 剪贴板安全修复与测试已 amend 回原 Task 7 功能检查点，进度也已折叠至文档检查点，未新增修复提交。 |
 | Task 8 / Step 1 | 已完成 | 默认/关闭生产链各 23/23、扩展 85/85、默认构建通过；独立复审 APPROVED。 |
 | Task 8 / Step 2 | 已完成 | 根 README 与 downstream 文档已更新候选状态与门禁实况；上游 `docs/` 镜像不承载下游文案。 |
-| Task 8 / Step 3 | 部分完成 | 兼容修复前隔离快照的完整 JVM 回归 669 项仍为同一 8 个 Windows/Robolectric/POSIX 基线失败，lint 0 error；当前候选提交上的协议相关 7 类定向回归 81/81 通过，未把旧快照表述为当前 HEAD 的完整回归。 |
+| Task 8 / Step 3 | 已完成 | Linux GitHub Actions 在 main 与 tag 上的完整单元测试和 Android Lint 均通过；Windows 隔离快照仍有同一 8 个 Robolectric/POSIX 环境基线失败，已保留记录。 |
 | Task 8 / Step 4 | 已完成 | 当前候选的签名 Release APK 构建成功；`apkanalyzer` / `aapt` 确认主应用 `fuck.andes`、Eta Launcher、`2.6.0.znmlr.1` / `26001`，签名验证通过，SHA-256 为 `BADB88886369328A65D72D1294A2B9B166612738829C02053D99F4D31689B7EF`。 |
 | Task 8 / Step 5 | 已完成 | 文档、CI、候选产物、历史与剪贴板安全修复已整合；最终静态安全复审 APPROVED。 |
 | Task 9 / Step 1 | 已完成 | 已在 Android 真机安装 `2.6.0.znmlr.1` Debug APK，并确认 Codex OAuth 认证界面可进入。 |
@@ -71,7 +71,7 @@
 | Task 9 / Step 4 | 已完成 | `adb install -r` 后强制停止并重启 Eta，用户未重新登录即成功拉取 7 个 Codex 模型并完成切换后的真实调用，证明 AndroidKeyStore 凭据可跨进程恢复。 |
 | Task 9 / Step 5 | 已完成 | 用户确认没有也不需要 API Key，本项人工网络验收不适用；现有 API Key/UI/Factory 路径以 Task 5、6、7、8 的自动回归为准，未发起 Platform API 请求。 |
 | Task 9 / Step 6 | 待人工 | 需注销并以只计数、不输出匹配行的方式检查敏感日志。 |
-| Task 9 / Step 7 | 待人工 | 需记录脱敏验收结果，任一关键项失败则阻止发布。 |
+| Task 9 / Step 7 | 已完成（含缺口） | 已记录候选提交、真机成功项、CI 结果及脱敏失败类别；AndroidKeyStore instrumentation 与注销敏感日志计数未执行，作为发布已知验证缺口，不得追记为通过。 |
 | Task 10 / Step 1 | 已完成 | Debug-only 脱敏日志组件和阶段接线已完成，实施记录见 `CODEX_RESPONSES_DEBUGGING_PLAN.md`。 |
 | Task 10 / Step 2 | 已完成 | Debug APK 已构建并通过 ADB 覆盖安装，原登录数据保持。 |
 | Task 10 / Step 3 | 已完成 | 用户已发送一次固定最小文本；日志确认 HTTP 200、`Content-Type` 缺失，并在 SSE parser 前被误拒绝。 |
@@ -546,7 +546,7 @@ git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 
 注销 Codex 后确认状态回到未登录，再次选择 OAuth 请求时要求重新登录。清空并重新采集测试期间 logcat，只统计 `access_token`、`refresh_token`、`id_token`、`Authorization: Bearer`、`Chatgpt-Account-Id` 等敏感模式的匹配数量，不打印匹配行；期望数量为 0。
 
-- [ ] **Step 7: 记录验收结果**
+- [x] **Step 7: 记录验收结果**
 
 只记录候选提交 SHA、设备型号、Android 版本、每个步骤的 PASS/FAIL 和脱敏失败类别。任一认证、工具多轮、重启恢复、注销或敏感日志检查失败，都阻止发布；记录中不得包含验证码、token、账号 ID 或原始响应体。
 

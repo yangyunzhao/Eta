@@ -33,7 +33,7 @@
 | 完整 JVM 回归 | 部分完成 | 兼容修复前的 Windows 隔离快照共 669 项，仍为既有 5 类 8 项 Windows/Robolectric/POSIX 基线失败；当前候选协议相关 7 类定向测试 81/81 通过，未把旧快照表述为候选 HEAD 的完整回归。 |
 | Android Lint | 已完成 | 0 error、100 warnings。 |
 | AndroidKeyStore instrumentation | 待完成 | 两次均在安装测试 APK 时被设备以 `INSTALL_FAILED_USER_RESTRICTED` 拒绝，0 项测试实际执行；不得记为通过。 |
-| GitHub Actions main/tag 构建 | 待完成 | 需在最终提交推送后验证。 |
+| GitHub Actions main/tag 构建 | 已完成 | main run `31821661448` 与 tag run `31822538400` 均通过完整单元测试、Lint、签名恢复、Debug/Release 构建、APK 验证和上传。 |
 | 本地 Release APK 签名、版本与证书指纹 | 已完成 | 主应用 `fuck.andes`，应用名 Eta，Launcher 存在，无 `debuggable`/`testOnly`；`2.6.0.znmlr.1` / `26001`；APK Signature Scheme v2 验证通过，证书指纹与本表一致。 |
 
 ## 真机人工验收
@@ -50,4 +50,4 @@
 
 ## 发布状态
 
-本地签名候选 APK 为 `Eta-v2.6.0.znmlr.1-release.apk`，大小 `5,499,876` 字节，SHA-256 为 `BADB88886369328A65D72D1294A2B9B166612738829C02053D99F4D31689B7EF`。AndroidKeyStore instrumentation 未实际执行，必须作为发布已知验证缺口保留；用户没有 API Key，因此对应人工网络验收不适用。在注销日志检查、最终 GitHub Actions、CI 签名产物核验和远端回执完成前，不创建或推送 `v2.6.0.znmlr.1` tag，不发布 GitHub Release。
+本地签名候选 APK 为 `Eta-v2.6.0.znmlr.1-release.apk`，大小 `5,499,876` 字节，SHA-256 为 `BADB88886369328A65D72D1294A2B9B166612738829C02053D99F4D31689B7EF`。最终 CI Release APK 大小为 `5,497,736` 字节，SHA-256 为 `0BD87A1AEB4D3F693EDEC206EB5812402122354D409FFCDD21BFEBEBEDBE0F5F`，签名证书与本表一致。tag `v2.6.0.znmlr.1` 精确指向 `16453f3c594c8f5d34d0bbba3aba0922ef190e39`，GitHub Release 已发布：https://github.com/yangyunzhao/Eta/releases/tag/v2.6.0.znmlr.1 。AndroidKeyStore instrumentation 与注销敏感日志计数未实际执行，必须作为本版本已知验证缺口保留；用户没有 API Key，因此对应人工网络验收不适用。

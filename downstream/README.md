@@ -9,7 +9,7 @@
 - [模型目录实施计划](CODEX_OAUTH_MODELS_PLAN.md)
 - [v2.6.0.znmlr.1 发布核对记录](RELEASE_V2.6.0_ZNMLR_1_CHECKLIST.md)
 
-Tasks 1–11 已形成发布候选：认证标识与数据库迁移、设备码协议、AndroidKeyStore 加密凭据、登录与刷新生命周期、Runtime 安全传输、Codex Responses Provider、固定 OAuth 模型目录、设备码设置页、编译期开关和下游版本规则均已落地。当前候选为 `versionName 2.6.0.znmlr.1`、`versionCode 26001`，尚无 tag、GitHub Release 或推送。真机已经完成登录、最小问答、一次本地只读工具回合、进程重启恢复、7 个模型拉取与切换调用；发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0` 并完成协议兼容修正。用户没有也不需要 API Key，该人工网络验收不适用，原路径以自动回归为准。注销日志检查和最终 GitHub Actions 产物核验仍待完成。
+Tasks 1–12 已形成并发布 `v2.6.0.znmlr.1`：认证标识与数据库迁移、设备码协议、AndroidKeyStore 加密凭据、登录与刷新生命周期、Runtime 安全传输、Codex Responses Provider、固定 OAuth 模型目录、设备码设置页、编译期开关和下游版本规则均已落地。真机已经完成登录、最小问答、一次本地只读工具回合、进程重启恢复、7 个模型拉取与切换调用；发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0` 并完成协议兼容修正。main 与 tag GitHub Actions 均通过。用户没有也不需要 API Key，该人工网络验收不适用，原路径以自动回归为准。AndroidKeyStore instrumentation 和注销后的敏感日志计数仍是已知验证缺口。
 
 本地自动门禁的实际结果是：兼容修复前隔离快照的完整 JVM 回归共 669 项，仍复现同一组 8 个 Windows/Robolectric/POSIX 基线失败，lint 为 0 error；当前候选的协议相关 7 类定向回归 81/81 和签名 Release 构建通过，没有新增 OAuth 失败。AndroidKeyStore instrumentation 已在真机发起，但设备两次拒绝 USB 安装测试 APK，因此 0 项测试实际执行，不能标记为通过。
 
