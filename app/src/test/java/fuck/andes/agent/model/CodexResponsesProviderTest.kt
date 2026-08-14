@@ -171,6 +171,22 @@ class CodexResponsesProviderTest {
     }
 
     @Test
+    fun `missing response Content-Type still parses a valid SSE body`() {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body(completedSse("ok"))
+                .build(),
+        )
+
+        val response = provider(
+            SequenceCredentialProvider(listOf(credential("access-one"))),
+        ).complete(basicRequest(), AgentRunController())
+
+        assertEquals("ok", response.assistantMessage.getString("content"))
+    }
+
+    @Test
     fun `SSE text reasoning tool usage and terminal output reuse Responses semantics`() {
         val output = JSONArray()
             .put(

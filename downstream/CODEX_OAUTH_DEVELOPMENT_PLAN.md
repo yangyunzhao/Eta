@@ -67,15 +67,15 @@
 | Task 8 / Step 5 | 已完成 | 文档、CI、候选产物、历史与剪贴板安全修复已整合；最终静态安全复审 APPROVED。 |
 | Task 9 / Step 1 | 已完成 | 已在 Android 真机安装 `2.6.0.znmlr.1` Debug APK，并确认 Codex OAuth 认证界面可进入。 |
 | Task 9 / Step 2 | 部分完成 | Eta 保持前台、由 PC 打开固定验证页时授权后成功登录，证明轮询、token exchange 与首次凭据保存可用；同机打开系统浏览器会丢失内存登录会话，正式路径仍未通过。 |
-| Task 9 / Step 3 | 进行中（失败） | 首个真实最小提问进入 Codex Responses 路径后显示稳定脱敏错误 `CODEX_RESPONSES_PROTOCOL_FAILURE_UNCLASSIFIED`；当前 APK 无法区分 Content-Type、SSE 解析或服务端终态失败，待 Debug 诊断日志定位。 |
+| Task 9 / Step 3 | 部分完成 | 普通问答已真机成功：修复 HTTP 200 缺少 `Content-Type` 时误拒绝合法 SSE 的问题后，Eta 返回“2+3等于5”，日志终态为 `response.completed` / `sse_complete`。尚待一次本地只读工具调用及工具结果后续答。 |
 | Task 9 / Step 4 | 待人工 | 需在真实设备上验证进程重启后的凭据恢复。 |
 | Task 9 / Step 5 | 待人工 | 需人工确认原 API Key 界面和配置未受影响。 |
 | Task 9 / Step 6 | 待人工 | 需注销并以只计数、不输出匹配行的方式检查敏感日志。 |
 | Task 9 / Step 7 | 待人工 | 需记录脱敏验收结果，任一关键项失败则阻止发布。 |
-| Task 10 / Step 1 | 进行中 | 已批准 Debug-only 详细脱敏日志方案，实施计划见 `CODEX_RESPONSES_DEBUGGING_PLAN.md`。 |
-| Task 10 / Step 2 | 进行中 | Provider/SSE 脱敏阶段接线已完成；待 APK 构建与 ADB 覆盖安装。 |
-| Task 10 / Step 3 | 待人工 | 安装后需用户发送一次固定最小文本，以脱敏日志确定真实根因。 |
-| Task 10 / Step 4 | 待开始 | 根据单一根因执行 TDD 修复、复审、重装并验证成功。 |
+| Task 10 / Step 1 | 已完成 | Debug-only 脱敏日志组件和阶段接线已完成，实施记录见 `CODEX_RESPONSES_DEBUGGING_PLAN.md`。 |
+| Task 10 / Step 2 | 已完成 | Debug APK 已构建并通过 ADB 覆盖安装，原登录数据保持。 |
+| Task 10 / Step 3 | 已完成 | 用户已发送一次固定最小文本；日志确认 HTTP 200、`Content-Type` 缺失，并在 SSE parser 前被误拒绝。 |
+| Task 10 / Step 4 | 已完成 | 缺失类型的合法 SSE fixture 已先 RED 后 GREEN；修复 APK 已覆盖安装，真机请求返回正确答案，日志终态与认证脱敏扫描通过。 |
 
 > 注：完整 JVM 基线目前有 8 个非 OAuth 失败；6 个为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个分别是 Windows 下 `Uri` 对盘符路径的解析差异，以及 `AtomicFile` 依赖的覆盖重命名在 Windows 下失败。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
 

@@ -25,8 +25,9 @@
 | Task 1 / Step 3–5 | 已完成 | Logger GREEN：关闭开关 sink 为 0，64 KiB 安全截断及可重组 chunk 元数据已覆盖；与进度一并 amend `feat(debug): 增加 Codex 协议脱敏日志`。 |
 | Task 2 / Step 1–2 | 已完成 | MockWebServer 覆盖非 SSE、非法 JSON、顶层 error、response.failed 与 completed；新增 `debugLogger` 注入参数缺失时按预期 RED。 |
 | Task 2 / Step 3–5 | 已完成 | Provider/SSE 已接入固定阶段和脱敏合法帧；Codex/OpenAI 定向测试已 GREEN，联合回归通过后 amend 到同一功能提交。 |
-| Task 3 / Step 1–3 | 待开始 | APK 构建、安装和一次真实日志捕获尚未执行。 |
-| Task 4 / Step 1–5 | 待开始 | 根因测试、修复、复审和真机成功尚未执行。 |
+| Task 3 / Step 1–3 | 已完成 | Debug APK 已构建并覆盖安装；用户发送固定最小文本后，脱敏日志确认 HTTP 200 但响应缺少 `Content-Type`，旧代码在进入 SSE parser 前报 `content_type_mismatch`。 |
+| Task 4 / Step 1–2 | 已完成 | MockWebServer 缺失 `Content-Type` 的合法 SSE fixture 先按预期 RED；Provider 现仅拒绝明确存在且非 SSE 的类型，缺失类型继续交由严格 SSE parser 验证。 |
+| Task 4 / Step 3–5 | 已完成 | `CodexResponsesProviderTest` 12/12 GREEN，Debug APK 构建成功并以 `adb install -r` 覆盖安装；用户再次发送固定文本后 Eta 返回“2+3等于5”，日志达到 `response.completed` / `sse_complete`，认证哨兵扫描为 0。 |
 
 ---
 
@@ -109,19 +110,19 @@ Task 2 进度 amend 到 Task 1 功能提交，不新增纯接线或进度提交�
 - Update: `downstream/CODEX_RESPONSES_DEBUGGING_PLAN.md`
 - Update: `downstream/CODEX_OAUTH_DEVELOPMENT_PLAN.md`
 
-- [ ] **Step 1: 构建并静态检查 APK**
+- [x] **Step 1: 构建并静态检查 APK**
 
 Run: `./gradlew :app:assembleDebug`
 
 Expected: BUILD SUCCESSFUL；APK versionName 为 `2.6.0.znmlr.1`，详细 logger 受 `BuildConfig.DEBUG` 门禁。
 
-- [ ] **Step 2: 经用户已授权后覆盖安装**
+- [x] **Step 2: 经用户已授权后覆盖安装**
 
 Run: `adb install -r app/build/outputs/apk/debug/app-debug.apk`
 
 Expected: `Success`，不清应用数据；安装后登录状态仍可读取。若 Android 因签名不一致要求卸载，立即停止并请求用户决定。
 
-- [ ] **Step 3: 请求人工发送一次固定文本并采集日志**
+- [x] **Step 3: 请求人工发送一次固定文本并采集日志**
 
 先清空 logcat 并启动仅 Tag `EtaCodexProtocol` 的监听，然后通知用户发送：`只回答：2+3等于多少？不要调用工具。` 一次。收到成功或失败后立即停止监听；本地只保留脱敏输出，按关联 ID确定根因 stage，不自动重试。
 
@@ -132,22 +133,22 @@ Expected: `Success`，不清应用数据；安装后登录状态仍可读取。�
 - Update: `downstream/CODEX_RESPONSES_DEBUGGING_PLAN.md`
 - Update: `downstream/CODEX_OAUTH_DEVELOPMENT_PLAN.md`
 
-- [ ] **Step 1: 写能复现真实证据的 RED 测试**
+- [x] **Step 1: 写能复现真实证据的 RED 测试**
 
 把 Task 3 观察到的 HTTP/SSE 形态转换成 MockWebServer fixture，断言当前代码产生同一失败；测试不得包含真实 prompt、token、账号 ID 或原始服务端敏感正文。
 
-- [ ] **Step 2: 只实现该根因的最小修复**
+- [x] **Step 2: 只实现该根因的最小修复**
 
 若证据是请求字段/Header 指纹差异，只改固定协议字段；若是已知 SSE event/terminal 形态，只扩展 parser；若是服务端明确拒绝，保留稳定脱敏分类并按官方 Codex 0.147.0 已验证协议修正请求。不得顺带重构。
 
-- [ ] **Step 3: 定向 GREEN、回归、构建与独立复审**
+- [x] **Step 3: 定向 GREEN、回归、构建与独立复审**
 
 Run Task 2 的联合回归、`git diff --check` 和 `./gradlew :app:assembleDebug`；独立 reviewer 检查认证泄漏、API Key 回归和测试是否真实覆盖根因。
 
-- [ ] **Step 4: amend 中文修复提交并覆盖安装**
+- [x] **Step 4: amend 中文修复提交并覆盖安装**
 
 中文提交说明：`fix(agent): 修复 Codex Responses 真实请求协议`。覆盖安装仍使用 `adb install -r`，不得卸载或清数据。
 
-- [ ] **Step 5: 经通知后完成一次成功请求**
+- [x] **Step 5: 经通知后完成一次成功请求**
 
 通知用户再次发送同一固定文本一次；Eta 必须返回 `5`，日志终态为 `response.completed`，且认证哨兵扫描为 0。成功后将 Task 9 Step 3 的普通问答子项标记完成；工具多轮仍单独验收。

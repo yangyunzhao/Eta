@@ -169,7 +169,10 @@ internal class CodexResponsesProvider private constructor(
                 if (!response.isSuccessful) {
                     throw CodexResponsesException(CodexResponsesFailure.HTTP_FAILURE)
                 }
-                if (contentType?.substringBefore(';')?.trim()?.lowercase() != "text/event-stream") {
+                if (
+                    contentType != null &&
+                    contentType.substringBefore(';').trim().lowercase() != "text/event-stream"
+                ) {
                     trace.log("content_type_mismatch", JSONObject().put("status", response.code), attempt)
                     throw CodexResponsesException(CodexResponsesFailure.PROTOCOL_FAILURE)
                 }
