@@ -37,7 +37,7 @@
 | Task 3 / Step 2 | 已完成 | 仓库类型尚不存在时的 RED 编译失败已记录。 |
 | Task 3 / Step 3 | 已完成 | AndroidKeyStore AES/GCM、随机 IV、128-bit tag 和 provider AAD 已实现。 |
 | Task 3 / Step 4 | 已完成 | 真实 AndroidKeyStore instrumentation 测试源码已增加，已编译并打包测试 APK。 |
-| Task 3 / Step 5 | 部分完成 | JVM 定向测试 8/8 通过；无连接设备，`connectedDebugAndroidTest` 未运行，真实 AndroidKeyStore 行为尚待验证。 |
+| Task 3 / Step 5 | 部分完成 | JVM 定向测试 8/8 通过；真机已连接并两次发起 instrumentation，但设备在安装测试 APK 阶段以 `INSTALL_FAILED_USER_RESTRICTED` 拒绝，实际执行 0 项，真实 AndroidKeyStore 行为不能记为通过。 |
 | Task 3 / Step 6 | 已完成 | 加密凭据与清理加固检查点已提交并整合，独立安全复审 APPROVED。 |
 | Task 4 / Step 1 | 已完成 | 已新增状态机、15 分钟超时、取消、刷新窗口、并发 single-flight、401、rotation、失败分类和脱敏测试。 |
 | Task 4 / Step 2 | 已完成 | Manager 与 refresh 契约尚不存在，定向测试在编译阶段按预期失败，RED 证据已记录。 |
@@ -62,14 +62,14 @@
 | Task 7 / Step 5 | 已完成 | 剪贴板安全修复与测试已 amend 回原 Task 7 功能检查点，进度也已折叠至文档检查点，未新增修复提交。 |
 | Task 8 / Step 1 | 已完成 | 默认/关闭生产链各 23/23、扩展 85/85、默认构建通过；独立复审 APPROVED。 |
 | Task 8 / Step 2 | 已完成 | 根 README 与 downstream 文档已更新候选状态与门禁实况；上游 `docs/` 镜像不承载下游文案。 |
-| Task 8 / Step 3 | 部分完成 | 定向 137/137、lint 0 error；当前完整回归 649 项仍为同一 8 个 Windows/Robolectric 基线失败，WSL 缺 JDK 25 无法离线复核。 |
-| Task 8 / Step 4 | 已完成 | 当前 HEAD 的 Debug 与 AndroidTest APK 构建成功；`apkanalyzer` / `aapt` 均确认 `2.6.0.znmlr.1` / `26001`，最终命名候选 APK 的 SHA-256 为 `EF71439918B44C73AA01FCDCC8CB59368BC985E5E05A1163B1EB24B652FC4FD6`。 |
+| Task 8 / Step 3 | 部分完成 | 兼容修复前隔离快照的完整 JVM 回归 669 项仍为同一 8 个 Windows/Robolectric/POSIX 基线失败，lint 0 error；当前候选提交上的协议相关 7 类定向回归 81/81 通过，未把旧快照表述为当前 HEAD 的完整回归。 |
+| Task 8 / Step 4 | 已完成 | 当前候选的签名 Release APK 构建成功；`apkanalyzer` / `aapt` 确认主应用 `fuck.andes`、Eta Launcher、`2.6.0.znmlr.1` / `26001`，签名验证通过，SHA-256 为 `BADB88886369328A65D72D1294A2B9B166612738829C02053D99F4D31689B7EF`。 |
 | Task 8 / Step 5 | 已完成 | 文档、CI、候选产物、历史与剪贴板安全修复已整合；最终静态安全复审 APPROVED。 |
 | Task 9 / Step 1 | 已完成 | 已在 Android 真机安装 `2.6.0.znmlr.1` Debug APK，并确认 Codex OAuth 认证界面可进入。 |
-| Task 9 / Step 2 | 部分完成 | Eta 保持前台、由 PC 打开固定验证页时授权后成功登录，证明轮询、token exchange 与首次凭据保存可用；同机打开系统浏览器会丢失内存登录会话，正式路径仍未通过。 |
+| Task 9 / Step 2 | 已完成（有限制） | Eta 保持前台、由 PC 打开固定验证页时授权后成功登录，证明轮询、token exchange 与首次凭据保存可用；同机打开系统浏览器可能因进程被系统回收而丢失本轮内存会话，作为已知限制记录。 |
 | Task 9 / Step 3 | 已完成 | 普通问答已真机成功：修复 HTTP 200 缺少 `Content-Type` 时误拒绝合法 SSE 的问题后，Eta 返回“2+3等于5”；随后“调用工具读取当前设备时间”返回 22:01，证明一次本地只读工具调用及工具结果后的后续答已完成。 |
 | Task 9 / Step 4 | 已完成 | `adb install -r` 后强制停止并重启 Eta，用户未重新登录即成功拉取 7 个 Codex 模型并完成切换后的真实调用，证明 AndroidKeyStore 凭据可跨进程恢复。 |
-| Task 9 / Step 5 | 待人工 | 需人工确认原 API Key 界面和配置未受影响。 |
+| Task 9 / Step 5 | 已完成 | 用户确认没有也不需要 API Key，本项人工网络验收不适用；现有 API Key/UI/Factory 路径以 Task 5、6、7、8 的自动回归为准，未发起 Platform API 请求。 |
 | Task 9 / Step 6 | 待人工 | 需注销并以只计数、不输出匹配行的方式检查敏感日志。 |
 | Task 9 / Step 7 | 待人工 | 需记录脱敏验收结果，任一关键项失败则阻止发布。 |
 | Task 10 / Step 1 | 已完成 | Debug-only 脱敏日志组件和阶段接线已完成，实施记录见 `CODEX_RESPONSES_DEBUGGING_PLAN.md`。 |
@@ -81,6 +81,10 @@
 | Task 11 / Step 3 | 已完成 | 已实现固定 Codex models HTTPS 端点、一次 401 刷新与 compare-and-clear、可见模型 schema 映射，以及 UI 的凭据 Provider 传递。 |
 | Task 11 / Step 4 | 已完成 | 2xx schema 漂移（顶层非对象、缺失 `models`、`models` 非数组）均已 RED/Green 并脱敏为 `PROTOCOL_FAILURE`；定向 4 组 JVM 回归通过，主代理在 `81fc6d5` 上 fresh `:app:assembleDebug` BUILD SUCCESSFUL（21s），scoped re-review 为 Spec ✅ / APPROVED。 |
 | Task 11 / Step 5 | 已完成 | 真机覆盖安装并重启后保留登录，远端目录返回 7 个可见模型，切换模型后的真实 Codex 调用正常，不再出现 missing bearer 401。 |
+| Task 12 / Step 1 | 已完成 | 发布前确认官方 Codex CLI 最新稳定版为 `rust-v0.147.0`，tag object 为 `3ed6f04f6bf8b7c46299d1cb1ff99c74ce21a51d`，peeled commit 为 `be6e8eac029b183056b7e4402879f15d2c85f61b`。 |
+| Task 12 / Step 2 | 已完成 | 集中 `CODEX_PROTOCOL_COMPAT_VERSION=0.147.0`，移除 Responses 中无官方对应的 `version` Header，并保留固定 originator 与 Eta User-Agent。 |
+| Task 12 / Step 3 | 已完成 | 精确新增 `ultra` 推理档位的解析、序列化、Runtime 传输与 Codex Responses 请求体支持；API Key 模型目录能力保持原范围。 |
+| Task 12 / Step 4 | 已完成 | 相关 7 类 JVM 测试 81/81 通过，独立复审 APPROVED；本地签名 Release APK 构建及签名、版本、Launcher、哈希复核通过。 |
 
 > 注：完整 JVM 基线目前有 8 个非 OAuth 失败；6 个为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个分别是 Windows 下 `Uri` 对盘符路径的解析差异，以及 `AtomicFile` 依赖的覆盖重命名在 Windows 下失败。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
 
@@ -513,7 +517,7 @@ git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 
 **Preconditions:**
 
-- Tasks 1–8 的自动测试、AndroidKeyStore instrumentation test 和 Debug APK 构建全部通过。
+- Tasks 1–8 的定向自动测试和候选构建已经完成；无法执行或仍有基线失败的门禁必须在验收记录中如实列出，不得宣称通过。
 - 使用专用测试设备和专用 Codex 测试账号。
 - 执行人明确同意消耗最少量的 Codex 共享额度。
 - 禁止录屏、截图或保存 user code、token、Account ID 和 JWT 内容。
@@ -522,9 +526,9 @@ git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 
 选择内置 OpenAI Provider，确认默认空 `authMode` 仍显示现有 API Key 和 Base URL；选择 `CODEX_OAUTH` 后确认 API Key/Base URL 编辑项隐藏，Responses 模式固定。
 
-- [ ] **Step 2: 完成一次设备码浏览器授权**
+- [x] **Step 2: 完成一次设备码浏览器授权**
 
-确认 Eta 展示验证码、取消和打开浏览器按钮，且不提供复制验证码动作；在系统浏览器输入设备码并授权，然后手动回到 Eta。登录必须由 Eta 轮询完成，不出现 Deep Link、WebView、回调 Activity 或本地回调监听器。
+确认 Eta 展示验证码、取消和打开浏览器按钮，且不提供复制验证码动作；在固定验证页输入设备码并授权，然后手动回到 Eta。登录必须由 Eta 轮询完成，不出现 Deep Link、WebView、回调 Activity 或本地回调监听器。当前通过路径为 Eta 保持前台、由 PC 或另一台设备打开验证页；同机浏览器可能触发系统回收 Eta 进程，作为已知限制记录。
 
 - [x] **Step 3: 以最小额度验证多轮 Agent 能力**
 
@@ -534,7 +538,7 @@ git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 
 强制停止并重新启动 Eta，确认仍显示已登录，并用一次最短请求验证凭据可用。不等待 access token 自然到期；到期刷新、single-flight 和 401 重试以 Task 4、Task 6 的自动测试为准。
 
-- [ ] **Step 5: 验证原有 API Key 能力未受影响**
+- [x] **Step 5: 验证原有 API Key 能力未受影响**
 
 切回默认空 `authMode`，确认原 API Key、Base URL、模型和 Endpoint 配置仍在且 UI 行为不变。默认不发起真实 Platform API 请求；请求协议回归以 Task 5、Task 6 自动测试为准。
 

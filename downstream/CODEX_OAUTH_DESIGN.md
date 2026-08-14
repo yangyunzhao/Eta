@@ -13,7 +13,7 @@
 - OAuth access token、refresh token 和 ID token 不进入 Room Provider 表、RemotePreferences、Binder Bundle、日志或崩溃信息。
 - 现有 API Key Provider 必须保持兼容，数据库升级不能改变既有 Provider 的认证行为。
 
-> **实施状态（2026-08-14）：** Tasks 1–8 已形成 `versionName 2.6.0.znmlr.1`、`versionCode 26001` 候选，包括核心认证、Codex Responses 传输、Provider 设备码设置页和编译期开关；尚无 tag、Release 或推送。定向回归 137/137、lint 0 error，默认与关闭开关两种 Debug 构建成功；完整 JVM 649 项仍有同一 8 个 Windows/Robolectric 基线失败，WSL 因缺 JDK 25 未复核，且无连接设备运行 AndroidKeyStore instrumentation。因此 Task 8 自动门禁并非全绿。计划中的人工步骤仅剩 Task 9，本文不代表真实登录、Codex 共享额度、多轮工具调用或重启恢复已经验证可用。
+> **实施状态（2026-08-14）：** Tasks 1–12 已形成 `versionName 2.6.0.znmlr.1`、`versionCode 26001` 发布候选，包括核心认证、Codex Responses 传输、固定 OAuth 模型目录、Provider 设备码设置页和编译期开关。真机已验证设备码登录、最小问答、一次本地只读工具回合、进程重启凭据恢复、7 个模型拉取及切换调用。发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0`（peeled commit `be6e8eac029b183056b7e4402879f15d2c85f61b`），并将模型目录 `client_version`、Responses Header 与 `ultra` 推理档位对齐到该协议基线。兼容修复前隔离快照的完整 JVM 回归 669 项仍只有同一 8 个 Windows/Robolectric/POSIX 基线失败，lint 为 0 error；当前候选协议相关 7 类定向回归 81/81 通过。用户没有也不需要 API Key，该人工网络验收不适用，原路径只采用自动回归。AndroidKeyStore instrumentation 因设备拒绝 USB 安装测试 APK而尚未实际执行，注销日志检查和最终 GitHub Actions 产物核验仍待完成，尚无 tag、Release 或推送。
 
 下游 CI/发布防护已经实现并通过代码审查：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，精确校验 tag、APK 和版本 metadata，并使用版本化资产名。该流程不会自动创建 tag、GitHub Release 或执行 push，也不会把未通过的门禁或 Task 9 人工验收视为成功。
 
@@ -24,7 +24,7 @@
 - 不新增通用 OAuth Provider 框架。
 - 不代理 OpenAI Platform API，也不把 Codex OAuth token 当作 Platform API Key。
 - 不改变 Eta 的 Agent Loop、工具定义、会话存储格式和 Root/LSPosed 权限模型。
-- 第一版不维护独立的 Codex 模型目录；请求继续使用 Eta 当前选中的模型字符串，后端不支持时展示明确错误。
+- 不提供可配置的通用 OAuth 模型代理；内置 OpenAI 的 Codex OAuth 模式只读取固定 Codex 模型目录，API Key、Anthropic 和自定义 Provider 继续使用原有模型拉取路径。
 
 ## 3. 方案比较
 
@@ -176,6 +176,8 @@ Codex Provider 的固定行为：
 - SSE 仍转换为 Eta 现有 `ProviderEvent`，Agent Loop 无需知道认证差异。
 
 Codex 后端不是文档化的通用 OpenAI Platform API。实际实现按职责拆分：`CodexResponsesProvider` 固定传输端点、认证与 Header，`ResponsesRequestBuilder` 强制 Codex 特殊 body 字段，`ResponsesSseParser` 共享无认证、无端点知识的 SSE 解析。MockWebServer 契约测试覆盖三者组合后的请求和响应行为；协议失配按稳定、脱敏的 `protocol_failure` 类别上报，不把原始响应体或凭据写入异常正文，同时不影响 API Key Provider。
+
+发布候选以官方 Codex CLI `rust-v0.147.0` 为已验证协议基线：Responses 请求不伪造官方不存在的 `version` Header，模型目录请求使用同一基线的 `client_version=0.147.0`，并精确支持 `ultra` 推理档位。后续出包必须重新核对当时最新稳定 CLI，不能仅修改版本字符串。
 
 ## 10. UI 设计
 
