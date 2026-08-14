@@ -13,6 +13,10 @@
 - OAuth access token、refresh token 和 ID token 不进入 Room Provider 表、RemotePreferences、Binder Bundle、日志或崩溃信息。
 - 现有 API Key Provider 必须保持兼容，数据库升级不能改变既有 Provider 的认证行为。
 
+> **实施状态（2026-08-14）：** Tasks 1–8 已形成 `versionName 2.6.0.znmlr.1`、`versionCode 26001` 候选，包括核心认证、Codex Responses 传输、Provider 设备码设置页和编译期开关；尚无 tag、Release 或推送。定向回归 137/137、lint 0 error，默认与关闭开关两种 Debug 构建成功；完整 JVM 649 项仍有同一 8 个 Windows/Robolectric 基线失败，WSL 因缺 JDK 25 未复核，且无连接设备运行 AndroidKeyStore instrumentation。因此 Task 8 自动门禁并非全绿。计划中的人工步骤仅剩 Task 9，本文不代表真实登录、Codex 共享额度、多轮工具调用或重启恢复已经验证可用。
+
+下游 CI/发布防护已经实现并通过代码审查：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，精确校验 tag、APK 和版本 metadata，并使用版本化资产名。该流程不会自动创建 tag、GitHub Release 或执行 push，也不会把未通过的门禁或 Task 9 人工验收视为成功。
+
 ## 2. 非目标
 
 - 不把 Codex CLI、SDK 或 App Server 嵌入 Android。
@@ -148,7 +152,8 @@ internal data class CodexOAuthCredential(
 
 - access token 在到期前 60 秒即视为需要刷新；
 - 同一 provider 的并发请求只允许一次 refresh，其他调用等待同一结果；
-- refresh 成功后原子替换完整凭据；
+- refresh 固定向 `https://auth.openai.com/oauth/token` 发送 JSON `client_id`、`grant_type=refresh_token` 和当前 `refresh_token`；
+- refresh 响应中的 access token、refresh token 和 ID token 都允许缺省，只轮换服务端实际返回的字段，其余字段保留当前值；成功后原子保存合并后的完整凭据；
 - refresh 返回无效授权时清除凭据并产生 `LoginRequired`；
 - 短暂网络失败不清除 refresh token，允许下一次请求重试；
 - 用户退出登录时先清除持久化密文，再更新 UI 状态。
@@ -162,7 +167,7 @@ Codex Provider 的固定行为：
 - 请求地址固定为 `https://chatgpt.com/backend-api/codex/responses`；
 - 强制 HTTPS、`stream=true`、`store=false`；
 - `Content-Type` 使用精确的 `application/json`；
-- 发送 bearer access token、Codex 客户端版本、`Originator`、Codex User-Agent、Responses beta Header；
+- 发送 bearer access token、Codex 客户端版本、`originator` 和稳定的 Codex User-Agent；不发送已经过时的 `OpenAI-Beta: responses=experimental`；
 - 有账号 ID 时发送 `Chatgpt-Account-Id`；
 - 不合并用户自定义 Authorization、Host、Originator、Account ID 或 Base URL；
 - 使用 Eta 当前选中的模型字符串；
@@ -170,7 +175,7 @@ Codex Provider 的固定行为：
 - 请求 reasoning 时包含可跨轮返回的加密 reasoning 内容；
 - SSE 仍转换为 Eta 现有 `ProviderEvent`，Agent Loop 无需知道认证差异。
 
-Codex 后端不是文档化的通用 OpenAI Platform API。所有端点、Header 和特殊字段必须集中在一个文件，并由 MockWebServer 契约测试覆盖；一旦协议失配，错误信息应指出“Codex OAuth 协议可能已变化”，同时不影响 API Key Provider。
+Codex 后端不是文档化的通用 OpenAI Platform API。实际实现按职责拆分：`CodexResponsesProvider` 固定传输端点、认证与 Header，`ResponsesRequestBuilder` 强制 Codex 特殊 body 字段，`ResponsesSseParser` 共享无认证、无端点知识的 SSE 解析。MockWebServer 契约测试覆盖三者组合后的请求和响应行为；协议失配按稳定、脱敏的 `protocol_failure` 类别上报，不把原始响应体或凭据写入异常正文，同时不影响 API Key Provider。
 
 ## 10. UI 设计
 
@@ -182,7 +187,7 @@ Codex 后端不是文档化的通用 OpenAI Platform API。所有端点、Header
 设备码卡片状态：
 
 - 未登录：显示“使用 Codex 设备码登录”；
-- 等待确认：显示验证码、验证网址、复制验证码、打开浏览器、取消；
+- 等待确认：显示验证码，通过按钮打开固定验证页，并可取消；验证码不写入系统剪贴板，避免离开 Eta 进程内存或跨 Binder 传输。
 - 已登录：显示“已连接 Codex”，可显示脱敏账号标签和“退出登录”；
 - 已失效：显示原因类别和“重新登录”。
 
@@ -226,7 +231,7 @@ Codex 后端不是文档化的通用 OpenAI Platform API。所有端点、Header
 ### Android/UI 测试
 
 - API Key 与 Codex OAuth 界面切换；
-- 设备码复制、浏览器 Intent、取消和旋转恢复；
+- 设备码不进入剪贴板/Binder、浏览器 Intent、取消和旋转恢复；
 - 已登录、已失效和退出登录状态；
 - UI 语义节点中不暴露 token。
 
@@ -241,10 +246,13 @@ Codex 后端不是文档化的通用 OpenAI Platform API。所有端点、Header
 
 ## 13. 发布与回退
 
+- 下游持续 fetch `Mangi-11/Eta` 上游更新；没有下游分叉时允许 fast-forward，已经产生下游分叉时使用普通 merge 保留双方历史，不对已发布的下游历史执行 rebase、reset 或强制推送；每次同步后重新验证 OAuth 与原 API Key 路径；
+- build、Git tag、GitHub Release 标题和发布资产统一使用 `v<上游版本>.znmlr.<下游序号>`，例如上游 `v2.6.0` 的首个下游候选为 `v2.6.0.znmlr.1`；同一上游版本递增序号，上游版本变化时重置为 `1`；
+- 上游版本基线必须来自已验证的 upstream release tag 及其 peeled commit，不能从任意分支名、README 或旧 `versionName` 推断；
 - 设置项标记“实验性”，说明它消耗 Codex 共享额度而非 Platform API 额度，并非无限免费；
-- 使用编译期功能开关 `BuildConfig.CODEX_OAUTH_ENABLED`，协议失配时可以在下游构建中只关闭新增入口；
+- 使用编译期功能开关 `BuildConfig.CODEX_OAUTH_ENABLED`，下游构建默认启用，协议失配时可以只关闭新增入口；默认与关闭开关两种 Debug 构建已经通过，但这不替代真实设备验收；
 - OAuth Provider 失败不得自动降级到 API Key，以免产生意外 API 账单；
-- 数据库迁移只增加有默认值的非敏感字段；关闭功能开关后，已有 API Key Provider 仍可正常工作；
+- 数据库迁移只增加有默认值的非敏感字段；开关关闭后的目标行为是隐藏 OAuth 入口并 fail-closed，不自动选择 OAuth、不回退 API Key、不删除既有 `auth_mode` 字段或 OAuth 密文，已有 API Key Provider 仍可正常工作；
 - 发布前重新核对 Codex 设备授权端点、client ID、Header 和请求体契约。
 
 ## 14. 完成标准

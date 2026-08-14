@@ -42,7 +42,7 @@
 | Task 4 / Step 1 | 已完成 | 已新增状态机、15 分钟超时、取消、刷新窗口、并发 single-flight、401、rotation、失败分类和脱敏测试。 |
 | Task 4 / Step 2 | 已完成 | Manager 与 refresh 契约尚不存在，定向测试在编译阶段按预期失败，RED 证据已记录。 |
 | Task 4 / Step 3 | 已完成 | 已统一登录 ownership、凭据保存和状态写入的线性化临界区，并实现状态机、single-flight 与 compare-and-clear。 |
-| Task 4 / Step 4 | 已完成 | Fresh 联合定向 47/47；独立二审 APPROVED；全量 610 项仍仅同一 8 个基线失败。 |
+| Task 4 / Step 4 | 已完成 | 联合定向 47/47；取消补偿竞态 4/4；两轮独立复审 APPROVED；全量仍仅同一 8 个基线失败。 |
 | Task 4 / Step 5 | 已完成 | 独立二审 APPROVED，登录生命周期代码已用中文提交为独立检查点。 |
 | Task 5 / Step 1 | 已完成 | 已增加 Runtime 配置验证与 Wire 脱敏失败测试；Factory 分流已调整至 Task 6。 |
 | Task 5 / Step 2 | 已完成 | RED 证据包括缺少 `authMode` 以及 Wire 误传 OAuth API Key。 |
@@ -57,23 +57,23 @@
 | Task 6 / Step 6 | 已完成 | 独立复审 APPROVED，Codex Responses 与 Factory 接入已用中文提交为独立检查点。 |
 | Task 7 / Step 1 | 已完成 | 已新增 Compose/Robolectric 测试，覆盖认证字段、登录状态、UI 动作、脱敏和固定浏览器 Intent。 |
 | Task 7 / Step 2 | 已完成 | 定向测试仅因 launcher 与认证 UI 尚不存在而按预期 RED，Compose 测试依赖已正常解析。 |
-| Task 7 / Step 3 | 已完成 | 已实现 Provider 级状态刷新、认证模式规范化和不改写持久配置的 OAuth Responses 运行时派生。 |
-| Task 7 / Step 4 | 已完成 | 强制 fresh UI/Manager/Runtime/Repository/API Key 六类 58/58 通过；独立复审 APPROVED。 |
-| Task 7 / Step 5 | 已完成 | 独立复审 APPROVED，设备码登录 UI 已用中文提交为独立检查点。 |
+| Task 7 / Step 3 | 已完成 | 已移除验证码复制动作及 `ClipboardManager`/Binder 边界，仅在进程内 Compose 显示；固定浏览器与取消行为保留。 |
+| Task 7 / Step 4 | 已完成 | 修复先经 12 项中 1 项精确 RED；强制 fresh UI/Manager/Runtime/Repository/Factory 六类 58/58 通过，终审 fresh 复审 APPROVED。 |
+| Task 7 / Step 5 | 已完成 | 剪贴板安全修复与测试已 amend 回原 Task 7 功能检查点，进度也已折叠至文档检查点，未新增修复提交。 |
 | Task 8 / Step 1 | 已完成 | 默认/关闭生产链各 23/23、扩展 85/85、默认构建通过；独立复审 APPROVED。 |
-| Task 8 / Step 2 | 未开始 | 待功能完成后按实际行为更新用户文档。 |
-| Task 8 / Step 3 | 未开始 | 待运行格式检查和完整单元测试。 |
-| Task 8 / Step 4 | 未开始 | 待构建 Debug APK。 |
-| Task 8 / Step 5 | 未开始 | 待提交文档和自动回归检查点。 |
-| Task 9 / Step 1 | 待人工 | 待 Tasks 1–8 门禁通过后，由人工安装 APK 检查认证界面。 |
-| Task 9 / Step 2 | 待人工 | 需在系统浏览器中完成一次真实设备码授权。 |
-| Task 9 / Step 3 | 待人工 | 需明确同意后消耗最少量 Codex 共享额度验证多轮 Agent。 |
+| Task 8 / Step 2 | 已完成 | 根 README 与 downstream 文档已更新候选状态与门禁实况；上游 `docs/` 镜像不承载下游文案。 |
+| Task 8 / Step 3 | 部分完成 | 定向 137/137、lint 0 error；当前完整回归 649 项仍为同一 8 个 Windows/Robolectric 基线失败，WSL 缺 JDK 25 无法离线复核。 |
+| Task 8 / Step 4 | 已完成 | 当前 HEAD 的 Debug 与 AndroidTest APK 构建成功；`apkanalyzer` / `aapt` 均确认 `2.6.0.znmlr.1` / `26001`，最终命名候选 APK 的 SHA-256 为 `EF71439918B44C73AA01FCDCC8CB59368BC985E5E05A1163B1EB24B652FC4FD6`。 |
+| Task 8 / Step 5 | 已完成 | 文档、CI、候选产物、历史与剪贴板安全修复已整合；最终静态安全复审 APPROVED。 |
+| Task 9 / Step 1 | 已完成 | 已在 Android 真机安装 `2.6.0.znmlr.1` Debug APK，并确认 Codex OAuth 认证界面可进入。 |
+| Task 9 / Step 2 | 部分完成 | Eta 保持前台、由 PC 打开固定验证页时授权后成功登录，证明轮询、token exchange 与首次凭据保存可用；同机打开系统浏览器会丢失内存登录会话，正式路径仍未通过。 |
+| Task 9 / Step 3 | 进行中（失败） | 首个真实最小提问进入 Codex Responses 路径后显示稳定脱敏错误 `CODEX_RESPONSES_PROTOCOL_FAILURE_UNCLASSIFIED`；当前 APK 无法区分 Content-Type、SSE 解析或服务端终态失败，待 Debug 诊断日志定位。 |
 | Task 9 / Step 4 | 待人工 | 需在真实设备上验证进程重启后的凭据恢复。 |
 | Task 9 / Step 5 | 待人工 | 需人工确认原 API Key 界面和配置未受影响。 |
 | Task 9 / Step 6 | 待人工 | 需注销并以只计数、不输出匹配行的方式检查敏感日志。 |
 | Task 9 / Step 7 | 待人工 | 需记录脱敏验收结果，任一关键项失败则阻止发布。 |
 
-> 注：完整 JVM 基线目前有 8 个非 OAuth 失败；其中 6 个已确认为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个为既存失败但仍待单独诊断。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
+> 注：完整 JVM 基线目前有 8 个非 OAuth 失败；6 个为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个分别是 Windows 下 `Uri` 对盘符路径的解析差异，以及 `AtomicFile` 依赖的覆盖重命名在 Windows 下失败。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
 
 ---
 
@@ -419,7 +419,7 @@ git commit -m "feat(provider): 使用 OAuth 调用 Codex Responses"
 
 - [x] **Step 1: 写 Compose 状态测试**
 
-断言 API Key 模式继续显示原输入框；Codex 模式隐藏 API Key/Base URL 编辑，展示设备码登录。等待状态包含验证码、复制、浏览器和取消按钮；点击浏览器按钮时，注入的 launcher 只收到 `https://auth.openai.com/codex/device`；已登录状态包含退出按钮；语义树不包含 token。
+断言 API Key 模式继续显示原输入框；Codex 模式隐藏 API Key/Base URL 编辑，展示设备码登录。等待状态包含验证码、浏览器和取消按钮，不提供任何把验证码写入系统剪贴板/Binder 的动作；点击浏览器按钮时，注入的 launcher 只收到 `https://auth.openai.com/codex/device`；已登录状态包含退出按钮；语义树不包含 token。
 
 - [x] **Step 2: 运行 UI 定向测试并确认失败**
 
@@ -468,7 +468,7 @@ git commit -m "feat(ui): 新增 Codex 设备码登录界面"
 
 关闭时不显示 OAuth 入口；数据库字段和 API Key Provider 仍正常。测试断言关闭开关不会自动选择 OAuth 或修改既有 Provider。
 
-- [ ] **Step 2: 更新用户文档**
+- [x] **Step 2: 更新用户文档**
 
 写明设备码步骤、共享额度不是无限免费、实验性协议风险、Root 环境 token 风险、退出方式，以及 OAuth 失败绝不自动产生 API 账单。
 
@@ -482,16 +482,16 @@ Run: `./gradlew :app:testDebugUnitTest`
 
 Expected: BUILD SUCCESSFUL；无真实网络和付费 API 调用。
 
-- [ ] **Step 4: 构建 Debug APK**
+- [x] **Step 4: 构建 Debug APK**
 
 Run: `./gradlew :app:assembleDebug`
 
 Expected: BUILD SUCCESSFUL，生成可安装 Debug APK。
 
-- [ ] **Step 5: 提交文档和自动回归检查点**
+- [x] **Step 5: 提交文档和自动回归检查点**
 
 ```bash
-git add app/build.gradle.kts README.md docs/README.md docs/README_EN.md docs/AGENT_RUNTIME.md downstream
+git add app/build.gradle.kts README.md downstream
 git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 ```
 
@@ -509,13 +509,13 @@ git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 - 执行人明确同意消耗最少量的 Codex 共享额度。
 - 禁止录屏、截图或保存 user code、token、Account ID 和 JWT 内容。
 
-- [ ] **Step 1: 安装候选 APK 并检查认证界面**
+- [x] **Step 1: 安装候选 APK 并检查认证界面**
 
 选择内置 OpenAI Provider，确认默认空 `authMode` 仍显示现有 API Key 和 Base URL；选择 `CODEX_OAUTH` 后确认 API Key/Base URL 编辑项隐藏，Responses 模式固定。
 
 - [ ] **Step 2: 完成一次设备码浏览器授权**
 
-确认 Eta 展示验证码、复制、取消和打开浏览器按钮；在系统浏览器输入设备码并授权，然后手动回到 Eta。登录必须由 Eta 轮询完成，不出现 Deep Link、WebView、回调 Activity 或本地回调监听器。
+确认 Eta 展示验证码、取消和打开浏览器按钮，且不提供复制验证码动作；在系统浏览器输入设备码并授权，然后手动回到 Eta。登录必须由 Eta 轮询完成，不出现 Deep Link、WebView、回调 Activity 或本地回调监听器。
 
 - [ ] **Step 3: 以最小额度验证多轮 Agent 能力**
 

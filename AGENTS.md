@@ -30,9 +30,10 @@
 ## 文档边界
 
 - 根目录 `README.md` 是下游项目入口，必须准确区分“已经实现”和“设计/计划中”的能力。
-- `docs/README.md` 与 `docs/README_EN.md` 保存上游完整项目说明；移动或同步时必须修复并验证相对链接。
+- `docs/` 是上游文档镜像区，包括 `README.md`、`README_EN.md`、`AGENT_RUNTIME.md`、`TECHNICAL.md`、`THIRD_PARTY_NOTICES.md` 和 `Screenshots/`；不得在这些文件中写入 Codex OAuth、`znmlr` 版本、下游候选状态或其他仅属于本 Fork 的说明。
+- 修改 `docs/` 前必须先与对应的 `upstream` 文件或 blob 比对。原则上这里只同步上游内容；`docs/README.md` 与 `docs/README_EN.md` 因从上游根目录移入 `docs/`，只允许为保持链接可用而做必要的相对路径调整。
 - 根目录 `downstream/` 保存本 Fork 的设计、开发计划、验收和维护记录，不放入 `docs/`。
-- 新增功能或状态变化后，同时更新根 README 和对应 downstream 文档，不得提前宣称尚未实现的能力已经可用。
+- 新增功能或状态变化后，只更新根 README 和对应 downstream 文档，不得借此修改上游文档镜像，也不得提前宣称尚未实现的能力已经可用。
 
 ## Codex OAuth 约束
 
