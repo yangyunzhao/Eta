@@ -5,6 +5,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 
 internal object CodexDeviceAuthDefaults {
     const val CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
+    const val REDIRECT_URI = "https://auth.openai.com/deviceauth/callback"
 
     val endpointBaseUrl: HttpUrl = "https://auth.openai.com/".toHttpUrl()
 }
@@ -19,6 +20,7 @@ internal data class CodexDeviceAuthorization(
 
 internal data class CodexAuthorizationCode(
     val value: String,
+    val codeChallenge: String,
     val codeVerifier: String,
 ) {
     override fun toString(): String = "CodexAuthorizationCode()"
@@ -28,10 +30,10 @@ internal data class CodexTokenSet(
     val accessToken: String,
     val refreshToken: String,
     val idToken: String,
-    val expiresInSeconds: Long,
+    val expiresAtEpochMillis: Long,
     val accountId: String?,
 ) {
-    override fun toString(): String = "CodexTokenSet(expiresInSeconds=$expiresInSeconds)"
+    override fun toString(): String = "CodexTokenSet(expiresAtEpochMillis=$expiresAtEpochMillis)"
 }
 
 internal enum class CodexDeviceAuthFailure {
