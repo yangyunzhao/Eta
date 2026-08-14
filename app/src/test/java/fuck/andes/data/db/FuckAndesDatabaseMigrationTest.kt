@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class FuckAndesDatabaseMigrationTest {
     @Test
-    fun migration6To14PreservesDataAndMovesBoundedConversationContext() {
+    fun migration6To15PreservesDataAndMovesBoundedConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
@@ -35,9 +35,16 @@ class FuckAndesDatabaseMigrationTest {
                 FuckAndesDatabase.MIGRATION_11_12,
                 FuckAndesDatabase.MIGRATION_12_13,
                 FuckAndesDatabase.MIGRATION_13_14,
+                FuckAndesDatabase.MIGRATION_14_15,
             )
             .build()
         try {
+            val databaseVersion = database.openHelper.readableDatabase
+                .query("PRAGMA user_version")
+                .use { cursor ->
+                    check(cursor.moveToFirst())
+                    cursor.getInt(0)
+                }
             val result = runBlocking(Dispatchers.IO) {
                 database.runtimeRunDao().runtimeResults().single()
             }
@@ -62,10 +69,19 @@ class FuckAndesDatabaseMigrationTest {
             val provider = runBlocking(Dispatchers.IO) {
                 database.providerDao().providerById("provider-1")!!.toDomain()
             }
+            val migratedProvider = database.openHelper.readableDatabase
+                .query("SELECT auth_mode, api_key FROM model_providers WHERE id = 'provider-1'")
+                .use { cursor ->
+                    check(cursor.moveToFirst())
+                    val authModeColumn = cursor.getColumnIndexOrThrow("auth_mode")
+                    val apiKeyColumn = cursor.getColumnIndexOrThrow("api_key")
+                    cursor.getString(authModeColumn) to cursor.getString(apiKeyColumn)
+                }
             val migratedMessage = runBlocking(Dispatchers.IO) {
                 database.conversationDao().messages().single()
             }
 
+            assertEquals(15, databaseVersion)
             assertEquals("保留的结果", result.content)
             assertEquals("[]", result.transcriptJson)
             assertEquals("保留的归档", archive.content)
@@ -86,6 +102,8 @@ class FuckAndesDatabaseMigrationTest {
             assertEquals("default", conversations.first { it.id == "conv-enabled" }.reasoningEffort)
             assertEquals(null, runBlocking(Dispatchers.IO) { database.conversationDao().state() })
             assertEquals(listOf("built-in", "manual"), provider.models.map { it.modelId })
+            assertEquals("", migratedProvider.first)
+            assertEquals("sk-existing", migratedProvider.second)
             assertEquals(false, provider.hostedWebSearchEnabled)
             assertEquals(false, migratedMessage.isEdited)
             assertEquals(
@@ -156,7 +174,7 @@ class FuckAndesDatabaseMigrationTest {
                             "INSERT INTO model_providers " +
                                 "(id, type, name, base_url, api_key, is_enabled, is_built_in, sort_order, " +
                                 "system_prompt, custom_headers_json, custom_body_json, created_at, endpoint_mode, anthropic_version) " +
-                                "VALUES ('provider-1', 'openai_compatible', 'Provider', 'https://example.com/v1', '', 1, 0, 0, " +
+                                "VALUES ('provider-1', 'openai_compatible', 'Provider', 'https://example.com/v1', 'sk-existing', 1, 0, 0, " +
                                 "NULL, '[]', '[]', 1, 'chat_completions', '2023-06-01')"
                         )
                         db.execSQL(providerModelInsert("built-in-id", "built-in", 1, 0))

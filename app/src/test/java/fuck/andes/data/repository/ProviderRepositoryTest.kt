@@ -6,6 +6,7 @@ import fuck.andes.data.db.FuckAndesDatabase
 import fuck.andes.data.model.AnthropicProviderSetting
 import fuck.andes.data.model.CustomHeader
 import fuck.andes.data.model.OpenAiCompatibleProviderSetting
+import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ModelSource
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.ReasoningEffort
@@ -131,6 +132,23 @@ class ProviderRepositoryTest {
         requireNotNull(config)
         assertEquals(provider.id, config.providerId)
         assertEquals("sk-test-key", config.apiKey)
+    }
+
+    @Test
+    fun resettingBuiltInProviderPreservesItsSelectedAuthMode() = runBlocking {
+        ProviderRepository.ensureBuiltInsMerged()
+        val provider = (ProviderRepository.providerById(BuiltinProviders.OPENAI_ID) as OpenAiCompatibleProviderSetting)
+            .copy(
+                apiKey = "sk-existing",
+                authMode = ProviderAuthModes.CODEX_OAUTH,
+            )
+
+        ProviderRepository.updateProvider(provider)
+        ProviderRepository.resetBuiltIn(provider.id)
+
+        val restored = ProviderRepository.providerById(provider.id)!!
+        assertEquals("sk-existing", restored.apiKey)
+        assertEquals(ProviderAuthModes.CODEX_OAUTH, restored.authMode)
     }
 }
 

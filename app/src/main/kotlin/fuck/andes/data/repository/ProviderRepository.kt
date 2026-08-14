@@ -15,6 +15,7 @@ import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.Settings
 import fuck.andes.data.model.selectedOrFirstModel
 import fuck.andes.data.model.withApiKey
+import fuck.andes.data.model.withAuthMode
 import fuck.andes.data.model.withModels
 import fuck.andes.data.model.withSortOrder
 import fuck.andes.data.provider.BuiltinProviders
@@ -104,7 +105,12 @@ internal object ProviderRepository {
         val current = providerById(id)
         val restored = seedOfficialModelsIfEmpty(
             current
-            ?.let { builtIn.withApiKey(it.apiKey).withSortOrder(it.sortOrder) }
+            ?.let {
+                builtIn
+                    .withApiKey(it.apiKey)
+                    .withAuthMode(it.authMode)
+                    .withSortOrder(it.sortOrder)
+            }
             ?: builtIn
         )
         replaceProvider(restored)

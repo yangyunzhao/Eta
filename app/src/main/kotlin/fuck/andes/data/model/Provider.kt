@@ -9,6 +9,10 @@ internal object ProviderTypes {
     const val CUSTOM = "custom"
 }
 
+internal object ProviderAuthModes {
+    const val CODEX_OAUTH = "codex_oauth"
+}
+
 internal object OpenAiEndpointMode {
     const val CHAT_COMPLETIONS = "chat_completions"
     const val RESPONSES = "responses"
@@ -35,6 +39,8 @@ sealed interface ProviderSetting {
     val baseUrl: String
     val sourceType: String
     val apiKey: String
+    val authMode: String
+        get() = ""
     val isEnabled: Boolean
     val isBuiltIn: Boolean
     val sortOrder: Int
@@ -55,6 +61,7 @@ data class OpenAiCompatibleProviderSetting(
     override val baseUrl: String,
     override val sourceType: String = ProviderSourceTypes.CUSTOM,
     override val apiKey: String = "",
+    override val authMode: String = "",
     override val isEnabled: Boolean = true,
     override val isBuiltIn: Boolean = false,
     override val sortOrder: Int = 0,
@@ -75,6 +82,7 @@ data class AnthropicProviderSetting(
     override val baseUrl: String,
     override val sourceType: String = ProviderSourceTypes.CUSTOM,
     override val apiKey: String = "",
+    override val authMode: String = "",
     override val isEnabled: Boolean = true,
     override val isBuiltIn: Boolean = false,
     override val sortOrder: Int = 0,
@@ -98,6 +106,7 @@ data class CustomProviderSetting(
     override val baseUrl: String,
     override val sourceType: String = ProviderSourceTypes.CUSTOM,
     override val apiKey: String = "",
+    override val authMode: String = "",
     override val isEnabled: Boolean = true,
     override val isBuiltIn: Boolean = false,
     override val sortOrder: Int = 0,
@@ -157,6 +166,13 @@ internal fun ProviderSetting.withApiKey(apiKey: String): ProviderSetting =
         is OpenAiCompatibleProviderSetting -> copy(apiKey = apiKey)
         is AnthropicProviderSetting -> copy(apiKey = apiKey)
         is CustomProviderSetting -> copy(apiKey = apiKey)
+    }
+
+internal fun ProviderSetting.withAuthMode(authMode: String): ProviderSetting =
+    when (this) {
+        is OpenAiCompatibleProviderSetting -> copy(authMode = authMode)
+        is AnthropicProviderSetting -> copy(authMode = authMode)
+        is CustomProviderSetting -> copy(authMode = authMode)
     }
 
 internal fun ProviderSetting.selectedOrFirstModel(modelId: String?): Model? =
