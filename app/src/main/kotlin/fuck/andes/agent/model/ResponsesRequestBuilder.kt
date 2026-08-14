@@ -34,6 +34,15 @@ internal object ResponsesRequestBuilder {
         return request
     }
 
+    fun buildCodex(
+        config: AgentModelClient.ModelConfig,
+        messages: JSONArray,
+        tools: JSONArray,
+    ): JSONObject = build(config, messages, tools).apply {
+        // Codex 的无状态多轮需要服务端回传加密 reasoning item；用户自定义字段不能覆盖。
+        put("include", JSONArray().put("reasoning.encrypted_content"))
+    }
+
     private fun buildInput(messages: JSONArray): JSONArray = JSONArray().also { input ->
         for (index in 0 until messages.length()) {
             val message = messages.optJSONObject(index) ?: continue

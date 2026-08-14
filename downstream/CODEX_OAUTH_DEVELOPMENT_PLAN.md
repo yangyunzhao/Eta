@@ -49,12 +49,12 @@
 | Task 5 / Step 3 | 已完成 | `ModelConfig` 条件验证、Runtime 投影和 Binder 二次清空已实现。 |
 | Task 5 / Step 4 | 已完成 | Runtime/Wire 定向测试 26/26 通过，旧 API Key 定向回归通过。 |
 | Task 5 / Step 5 | 已完成 | Runtime 安全传输检查点已提交并整合，独立审查 APPROVED。 |
-| Task 6 / Step 1 | 未开始 | 待编写 Factory 分流、Codex Responses 契约和 MockWebServer 失败测试。 |
-| Task 6 / Step 2 | 未开始 | 待编写 SSE 和认证错误失败测试。 |
-| Task 6 / Step 3 | 未开始 | 待运行 Task 6 定向测试并确认 RED。 |
-| Task 6 / Step 4 | 未开始 | 待实现 Codex Provider、最小共享解析器与 Factory 分流。 |
-| Task 6 / Step 5 | 未开始 | 待运行 Codex/API Key Responses 和 Factory 定向测试。 |
-| Task 6 / Step 6 | 未开始 | 待完成并提交独立检查点。 |
+| Task 6 / Step 1 | 已完成 | 已新增 Factory 分流、固定 URL/headers/body、历史与工具输入的失败测试。 |
+| Task 6 / Step 2 | 已完成 | 已新增 SSE、401 单次重试/二次清理、429、协议脱敏、重定向和取消测试。 |
+| Task 6 / Step 3 | 已完成 | 定向测试仅因 Codex Provider、稳定错误类型和显式凭据参数尚不存在而按预期 RED。 |
+| Task 6 / Step 4 | 已完成 | 已加固账号 Header、流内取消、二次 401 CAS、固定生产 trust domain 和 429 安全分类。 |
+| Task 6 / Step 5 | 已完成 | 强制 fresh Codex 10、API Key Responses 6、Factory 4，共 20/20 通过；独立复审 APPROVED。 |
+| Task 6 / Step 6 | 已完成 | 独立复审 APPROVED，Codex Responses 与 Factory 接入已用中文提交为独立检查点。 |
 | Task 7 / Step 1 | 未开始 | 待编写 Compose 状态测试。 |
 | Task 7 / Step 2 | 未开始 | 待运行 UI 定向测试并确认 RED。 |
 | Task 7 / Step 3 | 未开始 | 待实现状态 UI 和系统浏览器 Intent。 |
@@ -371,33 +371,33 @@ git commit -m "feat(agent): 安全传输 Codex OAuth Provider 配置"
 - Produces: `AgentProviderClient` ID `codex_oauth_responses`。
 - Produces: `ProviderClientFactory` 按已验证的 `authMode` 分流：Codex OAuth 选择新 Provider，空模式仍选择原 API Key Provider。
 
-- [ ] **Step 1: 写 Factory 分流与 MockWebServer 契约失败测试**
+- [x] **Step 1: 写 Factory 分流与 MockWebServer 契约失败测试**
 
 先用 `ProviderClientFactoryTest` 断言 Codex OAuth 配置选择 `CodexResponsesProvider`，空 `authMode` 的 API Key 配置仍选择 `OpenAiResponsesProvider`，OAuth 失败时不得回退。
 
 断言固定路径 `/backend-api/codex/responses`、bare `application/json`、bearer、`Originator`、Account ID、`stream=true`、`store=false`、完整历史、函数调用和函数结果。断言自定义 Base URL 与 Authorization Header 无法覆盖固定值。
 
-- [ ] **Step 2: 写 SSE 与认证错误失败测试**
+- [x] **Step 2: 写 SSE 与认证错误失败测试**
 
 覆盖文本、reasoning、tool call、usage、401 刷新后仅重试一次、第二次 401 要求登录、429 分类、取消请求。
 
-- [ ] **Step 3: 运行定向测试并确认失败**
+- [x] **Step 3: 运行定向测试并确认失败**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest' --tests '*ProviderClientFactoryTest'`
 
 Expected: FAIL，Codex Provider 和 Factory 分流尚不存在。
 
-- [ ] **Step 4: 实现独立 Provider 并抽取最小共享解析器**
+- [x] **Step 4: 实现独立 Provider 并抽取最小共享解析器**
 
 只从 `OpenAiResponsesProvider` 抽取无认证、无端点知识的 SSE 解析函数；API Key 请求构建保持原样。Codex 特殊字段由 `CodexResponsesProvider` 最终写入，用户自定义 body 不能覆盖 `model`、`input`、`tools`、`stream`、`store` 或 reasoning continuity 字段。`ProviderClientFactory` 只根据已验证的 `authMode` 选择 Provider，不将凭据回填到 `ModelConfig`。
 
-- [ ] **Step 5: 运行定向测试并确认通过**
+- [x] **Step 5: 运行定向测试并确认通过**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*CodexResponsesProviderTest' --tests '*OpenAiResponsesProviderTest' --tests '*ProviderClientFactoryTest'`
 
 Expected: PASS；API Key Responses 请求快照不变，空认证模式分流不变。
 
-- [ ] **Step 6: 提交独立检查点**
+- [x] **Step 6: 提交独立检查点**
 
 ```bash
 git add app/src/main/kotlin/fuck/andes/agent/model/CodexResponsesProvider.kt app/src/main/kotlin/fuck/andes/agent/model/ProviderClientFactory.kt app/src/main/kotlin/fuck/andes/agent/model/ResponsesRequestBuilder.kt app/src/test/java/fuck/andes/agent/model/CodexResponsesProviderTest.kt app/src/test/java/fuck/andes/agent/model/ProviderClientFactoryTest.kt app/src/test/java/fuck/andes/agent/model/OpenAiResponsesProviderTest.kt

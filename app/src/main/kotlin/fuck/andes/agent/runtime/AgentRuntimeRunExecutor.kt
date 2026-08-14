@@ -1,10 +1,12 @@
 package fuck.andes.agent.runtime
 
 import android.content.Context
+import fuck.andes.FuckAndesApp
 import fuck.andes.agent.accessibility.AgentAccessibilityKeeper
 import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.agent.model.AgentModelExecutionException
 import fuck.andes.agent.model.AgentHttpClient
+import fuck.andes.agent.model.ProviderClientFactory
 import fuck.andes.agent.memory.AgentMemoryContext
 import fuck.andes.agent.memory.AgentMemoryContextBuilder
 import fuck.andes.agent.overlay.AgentOverlayVisibilityPolicy
@@ -17,6 +19,7 @@ import fuck.andes.agent.tool.PendingSkillConflictCapabilityParser
 import fuck.andes.agent.tool.ToolExecutionDecision
 import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.core.safeLogType
+import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.repository.AgentMemoryRepository
 import kotlinx.coroutines.runBlocking
 
@@ -158,12 +161,23 @@ internal class AgentRuntimeRunExecutor(
             toolExecutor = executor
             toolsBinding = runController.register(executor::close)
             timing.preparationFinished(skillContext.installedSkills.size)
+            val modelProvider = ProviderClientFactory.getClient(
+                config = request.config,
+                codexCredentialProvider = if (
+                    request.config.authMode == ProviderAuthModes.CODEX_OAUTH
+                ) {
+                    FuckAndesApp.requireCodexCredentialProvider()
+                } else {
+                    null
+                },
+            )
             val completedResponse = AgentModelClient.complete(
                 config = request.config,
                 prompt = request.prompt,
                 toolExecutor = executor,
                 images = request.images,
                 history = request.history,
+                provider = modelProvider,
                 runController = runController,
                 skillContext = skillContext,
                 memoryContext = memoryContext,
