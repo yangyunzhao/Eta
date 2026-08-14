@@ -317,11 +317,15 @@ class AgentConversationStoreTest {
         assertEquals(null, snapshot.selectedConversationId)
     }
 
-    @Test
+    @Test(timeout = 30_000L)
     fun creatingConversationKeepsEmptyStateOutOfHistoryAndDatabase() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         try {
-            val state = AgentAppState(context, scope)
+            val state = AgentAppState(
+                context = context,
+                scope = scope,
+                startBackgroundInitialization = false,
+            )
 
             state.createConversation()
             state.createConversation()
