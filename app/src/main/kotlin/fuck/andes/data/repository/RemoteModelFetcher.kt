@@ -3,11 +3,14 @@ package fuck.andes.data.repository
 import fuck.andes.agent.model.AgentHttpClient
 import fuck.andes.agent.model.CustomHeaderFilter
 import fuck.andes.agent.model.ProviderUrls
+import fuck.andes.data.auth.CodexCredentialProvider
 import fuck.andes.data.model.AnthropicProviderSetting
+import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import fuck.andes.data.model.Model
 import fuck.andes.data.model.ModelReasoningCapabilities
 import fuck.andes.data.model.ModelSource
 import fuck.andes.data.model.ProviderSetting
+import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.data.provider.OfficialModelCatalog
 import java.util.UUID
@@ -29,15 +32,33 @@ internal object RemoteModelFetcher {
     private const val MAX_ERROR_CHARS = 600
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun fetch(provider: ProviderSetting): Result<List<Model>> =
+    suspend fun fetch(
+        provider: ProviderSetting,
+        codexCredentialProvider: CodexCredentialProvider? = null,
+    ): Result<List<Model>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                when (provider) {
-                    is AnthropicProviderSetting -> fetchAnthropic(provider)
+                when {
+                    provider.usesCodexOAuthModelDirectory() -> CodexModelsClient(
+                        checkNotNull(codexCredentialProvider) {
+                            "Codex OAuth credential provider is unavailable"
+                        },
+                    ).fetch(provider.id)
+                    provider is AnthropicProviderSetting -> fetchAnthropic(provider)
                     else -> fetchOpenAiCompatible(provider)
                 }
             }
         }
+
+    internal fun parseCodexModels(body: String): List<Model> {
+        val root = json.parseToJsonElement(body) as? JsonObject
+            ?: throw IllegalArgumentException("Codex models response must be a JSON object")
+        val models = root["models"] as? JsonArray
+            ?: throw IllegalArgumentException("Codex models response must contain a models array")
+        return models.mapNotNull { element ->
+            element.jsonObjectOrNull()?.toCodexModel()
+        }
+    }
 
     internal fun parseOpenAiModels(body: String): List<Model> {
         val data = json.parseToJsonElement(body)
@@ -59,6 +80,41 @@ internal object RemoteModelFetcher {
         return data.mapNotNull { element ->
             element.jsonObjectOrNull()?.toModel(defaultOwnedBy = "anthropic")
         }
+    }
+
+    private fun ProviderSetting.usesCodexOAuthModelDirectory(): Boolean =
+        authMode == ProviderAuthModes.CODEX_OAUTH && CodexOAuthFeaturePolicy.supportsProvider(this)
+
+    private fun JsonObject.toCodexModel(): Model? {
+        if (string("visibility") != "list") return null
+        val modelId = string("slug")?.trim().orEmpty()
+        if (modelId.isBlank()) return null
+        val supportedEfforts = this["supported_reasoning_levels"]
+            ?.jsonArrayOrNull()
+            ?.mapNotNull { it.jsonObjectOrNull()?.string("effort") }
+            ?.mapNotNull(ReasoningEffort::fromWireValue)
+            ?.filter { it != ReasoningEffort.DEFAULT && it != ReasoningEffort.OFF }
+            .orEmpty()
+        val defaultEffort = ReasoningEffort.fromWireValue(string("default_reasoning_level"))
+            ?.takeIf { it != ReasoningEffort.OFF }
+        val reasoningCapabilities = if (supportedEfforts.isNotEmpty() || defaultEffort != null) {
+            ModelReasoningCapabilities(
+                supportedEfforts = supportedEfforts,
+                defaultEffort = defaultEffort,
+            )
+        } else {
+            null
+        }
+        return Model(
+            id = UUID.randomUUID().toString(),
+            modelId = modelId,
+            displayName = string("display_name")?.trim().takeUnless { it.isNullOrBlank() } ?: modelId,
+            source = ModelSource.REMOTE,
+            contextWindow = int("context_window"),
+            inputModalities = stringList("input_modalities") ?: listOf(Model.TEXT_MODALITY),
+            reasoning = reasoningCapabilities != null,
+            reasoningCapabilities = reasoningCapabilities,
+        )
     }
 
     private fun fetchOpenAiCompatible(provider: ProviderSetting): List<Model> {

@@ -47,6 +47,41 @@ class RemoteModelFetcherTest {
     }
 
     @Test
+    fun parsesVisibleCodexModelsFromCodexDirectorySchema() {
+        val models = RemoteModelFetcher.parseCodexModels(
+            """
+            {
+              "models":[
+                {
+                  "slug":"gpt-test",
+                  "display_name":"GPT Test",
+                  "visibility":"list",
+                  "supported_in_api":false,
+                  "context_window":272000,
+                  "input_modalities":["text","image"],
+                  "default_reasoning_level":"medium",
+                  "supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"high"},{"effort":"ultra"}]
+                },
+                {"slug":"hidden-test","visibility":"hide"}
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val model = models.single()
+        assertEquals("gpt-test", model.modelId)
+        assertEquals("GPT Test", model.displayName)
+        assertEquals(272000, model.contextWindow)
+        assertEquals(listOf("text", "image"), model.inputModalities)
+        assertTrue(model.supportsReasoning)
+        assertEquals(ReasoningEffort.MEDIUM, model.reasoningCapabilities?.defaultEffort)
+        assertEquals(
+            listOf(ReasoningEffort.DEFAULT, ReasoningEffort.LOW, ReasoningEffort.MEDIUM, ReasoningEffort.HIGH),
+            model.reasoningCapabilities?.selectableEfforts,
+        )
+    }
+
+    @Test
     fun enrichesKnownModelsFromOfficialCatalog() {
         val provider = OpenAiCompatibleProviderSetting(
             id = "p1",

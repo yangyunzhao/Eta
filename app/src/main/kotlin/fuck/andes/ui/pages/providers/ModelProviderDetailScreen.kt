@@ -638,7 +638,15 @@ private fun ProviderModelsTab(
                                 isFetching = true
                                 message = null
                                 try {
-                                    val models = RemoteModelFetcher.fetch(provider).getOrElse { throwable ->
+                                    val codexCredentialProvider = if (
+                                        supportsCodexOAuth(provider) &&
+                                        provider.authMode == ProviderAuthModes.CODEX_OAUTH
+                                    ) {
+                                        FuckAndesApp.requireCodexCredentialProvider()
+                                    } else {
+                                        null
+                                    }
+                                    val models = RemoteModelFetcher.fetch(provider, codexCredentialProvider).getOrElse { throwable ->
                                         message = "失败：${throwable.message ?: throwable.javaClass.simpleName}"
                                         return@launch
                                     }
