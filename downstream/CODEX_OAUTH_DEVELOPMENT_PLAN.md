@@ -88,6 +88,7 @@
 | Task 13 / Step 1 | 已完成 | 本地以普通 merge 合入上游轻量 tag `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），未获取上游 `main` 的后续提交。 |
 | Task 13 / Step 2 | 已完成 | 处理 10 个文本冲突：保留上游 Provider UI/模型能力升级和下游 Codex OAuth；Room 升至 v16，以列检测兼容下游 OAuth v15 与上游模型覆盖 v15；设备码页显示并只复制固定公开验证网址，不复制验证码。 |
 | Task 13 / Step 3 | 已完成 | Kotlin 编译、最终 137 项 OAuth/Provider/迁移定向回归、Lint 与 Debug APK 构建通过；完整 JVM 714 项仍仅 8 个既有 Windows/Robolectric/POSIX 基线失败。 |
+| Task 13 / Step 4 | 已完成 | `main@005c8a9` 与 `v2.6.2.znmlr.1` tag 的 GitHub Actions 均通过；CI Release APK 经签名、版本和哈希复核后已发布。 |
 
 > 注：完整 JVM 基线目前有 8 个非 OAuth 失败；6 个为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个分别是 Windows 下 `Uri` 对盘符路径的解析差异，以及 `AtomicFile` 依赖的覆盖重命名在 Windows 下失败。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
 
@@ -568,6 +569,10 @@ git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 - [x] **Step 3: 完成候选自动验证**
 
 Kotlin 编译、最终 137 项 OAuth/Provider/迁移定向回归、Lint、Debug 与签名 Release 构建通过；完整 JVM 714 项仍仅有 8 个既有 Windows/Robolectric/POSIX 基线失败。`rust-v0.149.1` 协议差异已核对并记录在本候选发布记录中。
+
+- [x] **Step 4: 通过 CI 后发布下游 tag 与 Release**
+
+推送 `main@005c8a9` 并验证 CI 成功；创建不可移动 tag `v2.6.2.znmlr.1`，验证 tag CI 成功，核验其 Release APK 后发布 GitHub Release。
 
 ---
 

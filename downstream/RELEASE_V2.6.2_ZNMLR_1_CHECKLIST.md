@@ -33,16 +33,25 @@
 | 完整 JVM 回归 | 部分完成 | 714 项、8 个既有 Windows/Robolectric/POSIX 基线失败，无新增 OAuth 失败。 |
 | Android Lint | 已完成 | `:app:lintDebug` 成功。 |
 | 本地签名 Release APK | 已完成 | applicationId `fuck.andes`，`2.6.2.znmlr.1` / `26201`，APK Signature Scheme v2 验证通过。 |
-| GitHub Actions main/tag | 待完成 | 推送最终提交后验证。 |
+| GitHub Actions main/tag | 已完成 | main run `32696174121` 与 tag run `32697222715` 均通过完整单元测试、Lint、签名恢复、Debug/Release 构建、APK 校验和上传。 |
 
 ## 本地 Release APK
 
 | 项目 | 结果 |
 | --- | --- |
-| 文件 | `release/Eta-v2.6.2.znmlr.1-release.apk` |
+| 本地文件 | `release/Eta-v2.6.2.znmlr.1-release.apk` |
 | 大小 | `5,967,684` 字节 |
 | SHA-256 | `A15CB05A9B043C6D1EA2846CBAA5EB80050CB5678360B46018A9161021601EC3` |
 | 签名证书 SHA-256 | `44:4D:EB:65:E1:19:AE:74:38:6D:76:D2:16:FC:EE:70:62:B8:A9:0C:68:AF:28:DE:29:53:BE:24:D7:1D:C7:91` |
+
+## 最终 CI Release 与发布
+
+| 项目 | 结果 |
+| --- | --- |
+| tag | `v2.6.2.znmlr.1` → `005c8a9b5c565cc4b3300846833647e35efb77ea` |
+| CI Release APK 大小 | `5,965,548` 字节 |
+| CI Release APK SHA-256 | `2BB9C10E8A3A484511433814FCB7B5C5BFE344E93D951022455E292EE6B314E1` |
+| GitHub Release | `https://github.com/yangyunzhao/Eta/releases/tag/v2.6.2.znmlr.1` |
 
 ## 人工验收与已知缺口
 
@@ -51,4 +60,4 @@
 - 注销后的敏感 logcat 匹配计数尚未执行。
 - 同机浏览器可能回收 Eta 进程；可靠设备码路径是让 Eta 保持前台、由电脑或另一设备打开固定验证页。
 
-在 GitHub Actions main/tag、CI Release APK 签名/版本/哈希核验和远端回执完成前，不创建或推送 `v2.6.2.znmlr.1` tag，也不发布 GitHub Release。
+GitHub Actions main/tag、CI Release APK 签名/版本/哈希核验和远端回执均已完成，`v2.6.2.znmlr.1` 已正式发布。AndroidKeyStore instrumentation 与注销敏感日志计数仍为已知验证缺口，不得追记为通过。

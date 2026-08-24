@@ -12,7 +12,7 @@
 
 Tasks 1–12 已形成并发布 `v2.6.0.znmlr.1`：认证标识与数据库迁移、设备码协议、AndroidKeyStore 加密凭据、登录与刷新生命周期、Runtime 安全传输、Codex Responses Provider、固定 OAuth 模型目录、设备码设置页、编译期开关和下游版本规则均已落地。真机已经完成登录、最小问答、一次本地只读工具回合、进程重启恢复、7 个模型拉取与切换调用；发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0` 并完成协议兼容修正。main 与 tag GitHub Actions 均通过。用户没有也不需要 API Key，该人工网络验收不适用，原路径以自动回归为准。AndroidKeyStore instrumentation 和注销后的敏感日志计数仍是已知验证缺口。
 
-2026-08-24 本地 `main` 已合入上游 `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`）。下游构建基线随上游版本重置为 `2.6.2.znmlr.1` / `26201`；最新官方 Codex CLI `rust-v0.149.1` 已与既有 `0.147.0` 契约逐项比较，无必须迁移的请求/认证变化，故兼容基线常量不机械升级。
+2026-08-24 本地 `main` 已合入上游 `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），并发布 `v2.6.2.znmlr.1` / `26201`。最新官方 Codex CLI `rust-v0.149.1` 已与既有 `0.147.0` 契约逐项比较，无必须迁移的请求/认证变化，故兼容基线常量不机械升级。
 
 本地自动门禁的实际结果分为两段：`v2.6.0.znmlr.1` 历史候选的兼容定向回归为 81/81；当前 `v2.6.2.znmlr.1` 合并候选的 Kotlin 编译、137 项 OAuth/Provider/迁移定向回归、Lint、Debug 与签名 Release 构建均通过。完整 JVM 回归共 714 项，仍复现同一组 8 个 Windows/Robolectric/POSIX 基线失败，没有新增 OAuth 失败。AndroidKeyStore instrumentation 已在真机发起，但设备两次拒绝 USB 安装测试 APK，因此 0 项测试实际执行，不能标记为通过。
 
