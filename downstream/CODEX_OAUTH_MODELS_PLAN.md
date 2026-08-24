@@ -11,6 +11,7 @@
 ## Global Constraints
 
 - `CODEX_PROTOCOL_COMPAT_VERSION = "0.147.0"` 表示已验证的 Codex CLI 协议基线，不根据 Eta 版本或远程值自动改写。
+- 2026-08-24 已与最新稳定 `rust-v0.149.1`（peeled `ff29a44391deccde0aba0f8390337d7f3c319ea4`）比较：普通 OAuth 模型目录 path、`client_version` 和 schema 未变；企业 managed-residency Header 不适用于 Eta 路径，因此保持 `0.147.0` 常量。
 - OAuth 模型请求不得使用 `provider.baseUrl`、`provider.apiKey`、`provider.customHeaders` 或跟随重定向。
 - token、Account ID 和服务端错误正文不得进入 UI、日志或异常正文。
 - 首个 401 只刷新并重试一次；第二个 401 必须使用 rejected-token compare-and-clear，不得误删并发轮换后的新凭据。

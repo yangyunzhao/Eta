@@ -34,7 +34,7 @@ gh secret set ETA_RELEASE_KEY_PASSWORD
 - 推送 `v*.znmlr.*` 标签
 - 在 GitHub 的 `Actions > Eta Build` 中手动运行
 
-构建 APK 前，工作流会运行 `:app:test` 和 `:app:lint`；任一检查失败都会终止构建。
+构建 APK 前，工作流会运行 `:app:testDebugUnitTest` 和 `:app:lint`；任一检查失败都会终止构建。
 工作流只构建、验证和上传 Artifact，不会创建或修改 GitHub Release，也不会创建、
 移动或推送 Git 标签。
 

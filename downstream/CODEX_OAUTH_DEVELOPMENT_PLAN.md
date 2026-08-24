@@ -87,7 +87,7 @@
 | Task 12 / Step 4 | 已完成 | 相关 7 类 JVM 测试 81/81 通过，独立复审 APPROVED；本地签名 Release APK 构建及签名、版本、Launcher、哈希复核通过。 |
 | Task 13 / Step 1 | 已完成 | 本地以普通 merge 合入上游轻量 tag `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），未获取上游 `main` 的后续提交。 |
 | Task 13 / Step 2 | 已完成 | 处理 10 个文本冲突：保留上游 Provider UI/模型能力升级和下游 Codex OAuth；Room 升至 v16，以列检测兼容下游 OAuth v15 与上游模型覆盖 v15；设备码页显示并只复制固定公开验证网址，不复制验证码。 |
-| Task 13 / Step 3 | 已完成 | Kotlin 编译、67 项合并定向回归、Lint 与 Debug APK 构建通过；完整 JVM 714 项仍仅 8 个既有 Windows/Robolectric/POSIX 基线失败。 |
+| Task 13 / Step 3 | 已完成 | Kotlin 编译、最终 137 项 OAuth/Provider/迁移定向回归、Lint 与 Debug APK 构建通过；完整 JVM 714 项仍仅 8 个既有 Windows/Robolectric/POSIX 基线失败。 |
 
 > 注：完整 JVM 基线目前有 8 个非 OAuth 失败；6 个为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个分别是 Windows 下 `Uri` 对盘符路径的解析差异，以及 `AtomicFile` 依赖的覆盖重命名在 Windows 下失败。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
 
@@ -552,6 +552,22 @@ git commit -m "docs(auth): 记录 Codex OAuth 设备码登录"
 - [x] **Step 7: 记录验收结果**
 
 只记录候选提交 SHA、设备型号、Android 版本、每个步骤的 PASS/FAIL 和脱敏失败类别。任一认证、工具多轮、重启恢复、注销或敏感日志检查失败，都阻止发布；记录中不得包含验证码、token、账号 ID 或原始响应体。
+
+---
+
+### Task 13: 上游 v2.6.2 同步与发布候选核对
+
+- [x] **Step 1: 精确合入上游 release tag**
+
+从 `upstream` 获取并普通合入轻量 tag `v2.6.2` 的 `bd4a14ceeda81b9063b9fde91b14e47f3851929f`，不合入其后的 `upstream/main` 提交。
+
+- [x] **Step 2: 处理冲突并保留 OAuth 边界**
+
+保留上游 Provider 模型页、模型能力与 UI 升级；保留 Codex OAuth 登录、固定模型目录与凭据边界。Room 升至 v16，支持两种历史 v15 schema。设备码页只显示并复制固定公开验证网址，不复制验证码或服务端返回 URL。
+
+- [x] **Step 3: 完成候选自动验证**
+
+Kotlin 编译、最终 137 项 OAuth/Provider/迁移定向回归、Lint、Debug 与签名 Release 构建通过；完整 JVM 714 项仍仅有 8 个既有 Windows/Robolectric/POSIX 基线失败。`rust-v0.149.1` 协议差异已核对并记录在本候选发布记录中。
 
 ---
 

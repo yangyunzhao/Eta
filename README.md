@@ -17,7 +17,7 @@
 
 当前发布版本为 [`v2.6.0.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v2.6.0.znmlr.1)（`versionCode 26001`），编译期 Codex OAuth 开关默认启用。真机已完成普通问答、一次本地只读工具回合、覆盖安装和进程重启后的凭据恢复，以及固定 Codex 模型目录的 7 个可见模型拉取与切换调用。发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0`，并将模型目录 `client_version`、Responses Header 与 `ultra` 推理档位对齐到该协议基线。main 与 tag GitHub Actions 的完整单元测试、Android Lint、签名恢复、Debug/Release 构建、版本和签名校验均通过。用户没有也不需要 API Key，因此该人工网络验收不适用，原路径只采用自动回归且不发起 Platform API 请求。AndroidKeyStore instrumentation 因手机拒绝 USB 安装测试 APK而尚未实际执行，注销后的敏感日志计数也尚未完成，均作为本版本的已知验证缺口保留。
 
-本地 `main` 已合入上游 [`v2.6.2`](https://github.com/Mangi-11/Eta/releases/tag/v2.6.2)（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），当前下游构建基线为 `2.6.2.znmlr.1` / `versionCode 26201`。它尚未创建下游 tag 或 GitHub Release，需在完整验证后按发布规则单独进行。
+本地 `main` 已合入上游 [`v2.6.2`](https://github.com/Mangi-11/Eta/releases/tag/v2.6.2)（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），当前下游构建基线为 `2.6.2.znmlr.1` / `versionCode 26201`。2026-08-24 已按最新官方 Codex CLI `rust-v0.149.1`（peeled `ff29a44391deccde0aba0f8390337d7f3c319ea4`）重新核对设备码、刷新、Responses 与模型目录契约：无必须迁移的变化，因此 `CODEX_PROTOCOL_COMPAT_VERSION` 保持代表已完整验证的 `0.147.0` 基线。当前候选尚未创建下游 tag 或 GitHub Release，需在 CI 与签名产物核验后按发布规则单独进行。
 
 仓库已经加入下游 CI/发布防护：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，并精确核对 tag、APK 和版本 metadata，发布资产使用版本化名称。该流程不会自动创建 tag、GitHub Release 或执行 push；当前候选也尚未以工作流结果证明自动门禁全绿。详细发布步骤见 `.github/RELEASING.md`。
 
@@ -27,6 +27,7 @@
 - [Codex OAuth 设计](downstream/CODEX_OAUTH_DESIGN.md)
 - [Codex OAuth 开发计划](downstream/CODEX_OAUTH_DEVELOPMENT_PLAN.md)
 - [v2.6.0.znmlr.1 发布核对记录](downstream/RELEASE_V2.6.0_ZNMLR_1_CHECKLIST.md)
+- [v2.6.2.znmlr.1 发布核对记录](downstream/RELEASE_V2.6.2_ZNMLR_1_CHECKLIST.md)
 
 ## 与上游的关系
 
