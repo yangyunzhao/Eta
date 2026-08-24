@@ -1,4 +1,6 @@
 package fuck.andes.ui.components
+import fuck.andes.R
+import androidx.compose.ui.res.stringResource
 
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,6 +60,8 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.window.WindowListPopup
 
 internal val ChatInputPopupMargin = 8.dp
+internal val ChatInputActionSize = 40.dp
+internal val ChatInputActionIconSize = 24.dp
 
 @Composable
 internal fun AgentAttachmentPickerButton(
@@ -100,13 +104,13 @@ internal fun AgentAttachmentPickerButton(
     Box(modifier = modifier) {
         IconButton(
             onClick = { showPopup = true },
-            minWidth = 38.dp,
-            minHeight = 38.dp,
+            minWidth = ChatInputActionSize,
+            minHeight = ChatInputActionSize,
         ) {
             Icon(
                 painter = painterResource(LucideR.drawable.lucide_ic_plus),
-                contentDescription = "添加附件",
-                modifier = Modifier.size(22.dp),
+                contentDescription = stringResource(R.string.ui_add_attachment_dba9e8),
+                modifier = Modifier.size(ChatInputActionIconSize),
                 tint = MiuixTheme.colorScheme.onSurface,
             )
         }
@@ -121,7 +125,12 @@ internal fun AgentAttachmentPickerButton(
             maxHeight = popupMaxHeight,
         ) {
             val dismiss = LocalDismissState.current
-            val options = remember { listOf("图片", "文件", "文件夹", "输入路径") }
+            val options = listOf(
+                stringResource(R.string.attachment_image),
+                stringResource(R.string.attachment_file),
+                stringResource(R.string.attachment_folder),
+                stringResource(R.string.attachment_enter_path),
+            )
             ListPopupColumn {
                 options.forEachIndexed { index, option ->
                     DropdownImpl(
@@ -153,22 +162,22 @@ internal fun AgentAttachmentPickerButton(
 
     WindowDialog(
         show = showPathDialog,
-        title = "输入文件路径",
-        summary = "支持内部存储或 /data/local/tmp 下的文件和文件夹",
+        title = stringResource(R.string.ui_input_file_path_36d474),
+        summary = stringResource(R.string.ui_supports_files_and_folders_under_internal_storage_or_520786),
         onDismissRequest = { showPathDialog = false },
     ) {
         Column {
             TextField(
                 value = pathInput,
                 onValueChange = { pathInput = it },
-                label = "绝对路径",
+                label = stringResource(R.string.ui_absolute_path_9ac6fc),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth(),
             )
             MiuixDialogActions(
-                confirmText = "添加",
+                confirmText = stringResource(R.string.attachment_add),
                 confirmEnabled = pathInput.trim().startsWith('/'),
                 onCancel = { showPathDialog = false },
                 onConfirm = {
@@ -244,7 +253,7 @@ internal fun PendingFileReferenceStrip(
                 ) {
                     Icon(
                         painter = painterResource(LucideR.drawable.lucide_ic_x),
-                        contentDescription = "移除文件引用",
+                        contentDescription = stringResource(R.string.ui_remove_file_reference_04bbfc),
                         modifier = Modifier.size(15.dp),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
                     )
@@ -310,6 +319,7 @@ internal fun SentFileReferenceFlow(
 
 internal class InputPopupPositionProvider(
     private val inputContainerTopPx: Int,
+    private val windowHorizontalInsetPx: Int? = null,
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -328,10 +338,15 @@ internal class InputPopupPositionProvider(
             else -> false
         }
         val physicalEnd = if (layoutDirection == LayoutDirection.Ltr) alignToEnd else !alignToEnd
-        val requestedX = if (physicalEnd) {
-            anchorBounds.right - popupContentSize.width - popupMargin.right
-        } else {
-            anchorBounds.left + popupMargin.left
+        val requestedX = when {
+            windowHorizontalInsetPx != null && physicalEnd ->
+                windowBounds.right - popupContentSize.width - popupMargin.right - windowHorizontalInsetPx
+
+            windowHorizontalInsetPx != null ->
+                windowBounds.left + popupMargin.left + windowHorizontalInsetPx
+
+            physicalEnd -> anchorBounds.right - popupContentSize.width - popupMargin.right
+            else -> anchorBounds.left + popupMargin.left
         }
         val maxX = (windowBounds.right - popupContentSize.width - popupMargin.right)
             .coerceAtLeast(windowBounds.left)

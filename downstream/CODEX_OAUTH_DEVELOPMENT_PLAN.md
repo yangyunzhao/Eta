@@ -6,7 +6,7 @@
 
 **Architecture:** 保留现有 API Key Provider 及其空认证模式语义，只新增 `CODEX_OAUTH` 标记，并实现独立的设备码协议、Keystore 凭据仓库、Token 生命周期管理和 `CodexResponsesProvider`。运行时配置只传 `authMode + providerId`，OAuth token 仅在 Eta Runtime 进程内解密和使用。
 
-**Tech Stack:** Kotlin、Jetpack Compose、Room 14→15、AndroidKeyStore AES/GCM、OkHttp、kotlinx.serialization、MockWebServer、JUnit/Robolectric。
+**Tech Stack:** Kotlin、Jetpack Compose、Room 14→16、AndroidKeyStore AES/GCM、OkHttp、kotlinx.serialization、MockWebServer、JUnit/Robolectric。
 
 ## Global Constraints
 
@@ -85,6 +85,9 @@
 | Task 12 / Step 2 | 已完成 | 集中 `CODEX_PROTOCOL_COMPAT_VERSION=0.147.0`，移除 Responses 中无官方对应的 `version` Header，并保留固定 originator 与 Eta User-Agent。 |
 | Task 12 / Step 3 | 已完成 | 精确新增 `ultra` 推理档位的解析、序列化、Runtime 传输与 Codex Responses 请求体支持；API Key 模型目录能力保持原范围。 |
 | Task 12 / Step 4 | 已完成 | 相关 7 类 JVM 测试 81/81 通过，独立复审 APPROVED；本地签名 Release APK 构建及签名、版本、Launcher、哈希复核通过。 |
+| Task 13 / Step 1 | 已完成 | 本地以普通 merge 合入上游轻量 tag `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），未获取上游 `main` 的后续提交。 |
+| Task 13 / Step 2 | 已完成 | 处理 10 个文本冲突：保留上游 Provider UI/模型能力升级和下游 Codex OAuth；Room 升至 v16，以列检测兼容下游 OAuth v15 与上游模型覆盖 v15；设备码页显示并只复制固定公开验证网址，不复制验证码。 |
+| Task 13 / Step 3 | 已完成 | Kotlin 编译、67 项合并定向回归、Lint 与 Debug APK 构建通过；完整 JVM 714 项仍仅 8 个既有 Windows/Robolectric/POSIX 基线失败。 |
 
 > 注：完整 JVM 基线目前有 8 个非 OAuth 失败；6 个为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个分别是 Windows 下 `Uri` 对盘符路径的解析差异，以及 `AtomicFile` 依赖的覆盖重命名在 Windows 下失败。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
 

@@ -12,7 +12,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -138,6 +140,7 @@ internal fun CodexDeviceLoginContent(
     onLogout: () -> Unit,
 ) {
     var browserLaunchFailed by remember(state) { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -154,6 +157,13 @@ internal fun CodexDeviceLoginContent(
                 Text(
                     text = state.userCode,
                     style = MiuixTheme.textStyles.title1,
+                )
+                Text(CODEX_VERIFICATION_PAGE_URL)
+                TextButton(
+                    text = "复制验证网址",
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(CODEX_VERIFICATION_PAGE_URL))
+                    },
                 )
                 TextButton(
                     text = "打开系统浏览器",

@@ -1,5 +1,7 @@
 package fuck.andes.ui.pages.providers
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
@@ -290,6 +292,31 @@ class CodexDeviceLoginContentTest {
         composeRule.runOnIdle {
             assertEquals(1, launcher.openCount)
             assertEquals(1, cancelCount)
+        }
+        composeRule.onNodeWithText("never-show", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("device_secret", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun awaitingStateShowsAndCopiesOnlyTheFixedPublicVerificationUrl() {
+        setAuthenticationContent(
+            authMode = ProviderAuthModes.CODEX_OAUTH,
+            loginState = CodexLoginState.AwaitingUser(
+                userCode = "ABCD-EFGH",
+                verificationUrl = "https://malicious.example/callback?device_secret=never-show",
+            ),
+        )
+
+        composeRule.onNodeWithText(CODEX_VERIFICATION_PAGE_URL).assertIsDisplayed()
+        composeRule.onNodeWithText("复制验证网址").performClick()
+
+        composeRule.runOnIdle {
+            val clipboard = RuntimeEnvironment.getApplication()
+                .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals(
+                CODEX_VERIFICATION_PAGE_URL,
+                clipboard.primaryClip?.getItemAt(0)?.coerceToText(RuntimeEnvironment.getApplication())?.toString(),
+            )
         }
         composeRule.onNodeWithText("never-show", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("device_secret", substring = true).assertDoesNotExist()

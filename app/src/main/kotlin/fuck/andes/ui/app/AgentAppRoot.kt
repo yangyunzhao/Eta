@@ -4,9 +4,11 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,32 +17,40 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation3.runtime.NavKey
 import fuck.andes.FuckAndesApp
+import fuck.andes.R
+import fuck.andes.agent.device.BoundedRootCommandExecutor
 import fuck.andes.agent.device.DeviceLocationProvider
+import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.data.repository.RuntimeConfigRepository
-import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberDecoratedNavEntries
-import androidx.navigation3.ui.NavDisplay
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.unit.dp
 import fuck.andes.ui.components.MiuixDialogActions
 import fuck.andes.ui.model.ConversationSummaryUi
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
+import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
+import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.window.WindowDialog
 import fuck.andes.ui.SettingsScreen
+import fuck.andes.ui.AppearanceSettingsScreen
 import fuck.andes.ui.pages.providers.ModelProviderDetailScreen
 import fuck.andes.ui.pages.providers.ModelProviderListScreen
 import fuck.andes.ui.model.AgentChatAction
@@ -72,8 +82,8 @@ fun AgentAppRoot(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val backStack = remember { mutableStateListOf<NavKey>(AppRoute.Home) }
-    val navigator = remember { AgentNavigator(backStack) }
+    val backStack = rememberNavBackStack<AppRoute>(AppRoute.Home)
+    val navigator = remember(backStack) { AgentNavigator(backStack) }
     val agentState = remember(context.applicationContext) {
         AgentAppState(
             context = context.applicationContext,
@@ -181,17 +191,32 @@ fun AgentAppRoot(
         }
     }
 
-    val entryProvider = remember(backStack) {
-        entryProvider<NavKey> {
-            entry<AppRoute.Home> {
+    val swipeBackDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
+        NavSwipeDirection.RightToLeft
+    } else {
+        NavSwipeDirection.LeftToRight
+    }
+    val swipeDismiss = swipeBackDirection.takeIf {
+        LocalAppearanceSettings.current.swipeDismissEnabled
+    }
+    NavDisplay(
+        backStack = backStack,
+        onBack = { popRoute() },
+        effects = NavDisplayEffects(
+            cornerClipRadius = rememberNavSystemCornerRadius(),
+        ),
+    ) {
+            entry<AppRoute.Home>(swipeDismiss = swipeDismiss) {
                 RoutedShell(route = AppRoute.Home) {
                     AgentHomeScreen(
                         state = agentState.homeState,
+                        modelPickerState = agentState.modelPickerState,
                         conversationKey = agentState.conversationPaneState.selectedConversationId,
                         onAction = { action ->
                             when (action) {
                                 is AgentHomeAction.ReasoningEffortChanged ->
                                     agentState.updateReasoningEffort(action.effort)
+                                is AgentHomeAction.ModelSelected -> agentState.selectModel(action.modelId)
                                 is AgentHomeAction.SubmitMessage -> agentState.sendCurrentMessage(action.text)
                                 AgentHomeAction.StopRun -> agentState.stopCurrentRun()
                                 is AgentHomeAction.ImageAttached -> agentState.attachImage(action.uri)
@@ -229,16 +254,18 @@ fun AgentAppRoot(
                     )
                 }
             }
-            entry<AppRoute.Chat> {
+            entry<AppRoute.Chat>(swipeDismiss = swipeDismiss) {
                 RoutedShell(route = AppRoute.Chat) {
                     AgentChatScreen(
                         state = agentState.homeState,
+                        modelPickerState = agentState.modelPickerState,
                         conversationKey = agentState.conversationPaneState.selectedConversationId,
                         onAction = { action ->
                             when (action) {
                                 AgentChatAction.NavigateBack -> popRoute()
                                 is AgentChatAction.ReasoningEffortChanged ->
                                     agentState.updateReasoningEffort(action.effort)
+                                is AgentChatAction.ModelSelected -> agentState.selectModel(action.modelId)
                                 is AgentChatAction.SubmitMessage -> agentState.sendCurrentMessage(action.text)
                                 AgentChatAction.StopRun -> agentState.stopCurrentRun()
                                 AgentChatAction.OpenBrowser -> pushRoute(AppRoute.Browser)
@@ -269,12 +296,12 @@ fun AgentAppRoot(
                     )
                 }
             }
-            entry<AppRoute.Browser> {
+            entry<AppRoute.Browser>(swipeDismiss = swipeDismiss) {
                 RoutedShell(route = AppRoute.Browser) {
                     AgentBrowserScreen()
                 }
             }
-            entry<AppRoute.Tools> {
+            entry<AppRoute.Tools>(swipeDismiss = swipeDismiss) {
                 AgentToolsScreen(
                     state = agentState.toolsState,
                     onAction = { action ->
@@ -285,7 +312,7 @@ fun AgentAppRoot(
                     },
                 )
             }
-            entry<AppRoute.Skills> {
+            entry<AppRoute.Skills>(swipeDismiss = swipeDismiss) {
                 LaunchedEffect(Unit) {
                     agentState.refreshSkills()
                 }
@@ -305,7 +332,7 @@ fun AgentAppRoot(
                     },
                 )
             }
-            entry<AppRoute.Permissions> {
+            entry<AppRoute.Permissions>(swipeDismiss = swipeDismiss) {
                 LaunchedEffect(Unit) {
                     agentState.refreshPermissionHealth()
                 }
@@ -332,8 +359,20 @@ fun AgentAppRoot(
                                         }
                                     }
                                     "background" -> {
-                                        runCatching {
-                                            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                        if (Build.MANUFACTURER.lowercase() in setOf("oppo", "realme", "oneplus")) {
+                                            coroutineScope.launch(Dispatchers.IO) {
+                                                BoundedRootCommandExecutor(AndroidAgentLogger).use {
+                                                    it.execute(
+                                                        "am start --user current -n " +
+                                                            "com.oplus.battery/com.oplus.powermanager.fuelgaue.PowerControlActivity " +
+                                                            "--es title Eta --es pkgName fuck.andes --es drainType APP",
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            runCatching {
+                                                context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                            }
                                         }
                                     }
                                     "app_list" -> {
@@ -405,7 +444,7 @@ fun AgentAppRoot(
                     },
                 )
             }
-            entry<AppRoute.SystemEnhance> {
+            entry<AppRoute.SystemEnhance>(swipeDismiss = swipeDismiss) {
                 SystemEnhanceScreen(
                     state = agentState.systemEnhanceState,
                     onAction = { action ->
@@ -416,14 +455,17 @@ fun AgentAppRoot(
                     },
                 )
             }
-            entry<AppRoute.Settings> {
+            entry<AppRoute.Settings>(swipeDismiss = swipeDismiss) {
                 SettingsScreen(
                     context = context,
                     onNavigate = { route -> pushRoute(route) },
                     onBack = ::popRoute
                 )
             }
-            entry<AppRoute.Memory> {
+            entry<AppRoute.AppearanceSettings>(swipeDismiss = swipeDismiss) {
+                AppearanceSettingsScreen(onBack = ::popRoute)
+            }
+            entry<AppRoute.Memory>(swipeDismiss = swipeDismiss) {
                 LaunchedEffect(Unit) {
                     agentState.refreshMemory()
                 }
@@ -441,59 +483,49 @@ fun AgentAppRoot(
                     },
                 )
             }
-            entry<AppRoute.LinuxEnvironment> {
+            entry<AppRoute.LinuxEnvironment>(swipeDismiss = swipeDismiss) {
                 LinuxEnvironmentScreen(
                     context = context,
                     onBack = ::popRoute,
                 )
             }
-            entry<AppRoute.ModelProviders> {
+            entry<AppRoute.ModelProviders>(swipeDismiss = swipeDismiss) {
                 ModelProviderListScreen(
                     onNavigate = { route -> pushRoute(route) },
                     onBack = ::popRoute
                 )
             }
-            entry<AppRoute.ModelProviderDetail> { route ->
+            entry<AppRoute.ModelProviderDetail>(swipeDismiss = swipeDismiss) { route ->
                 ModelProviderDetailScreen(
                     providerId = route.providerId,
                     onBack = ::popRoute
                 )
             }
-            entry<AppRoute.ModelProviderNew> { route ->
+            entry<AppRoute.ModelProviderNew>(swipeDismiss = swipeDismiss) { route ->
                 ModelProviderDetailScreen(
                     newType = route.type,
                     onBack = ::popRoute
                 )
             }
-        }
     }
-    val entries = rememberDecoratedNavEntries(
-        backStack = backStack,
-        entryProvider = entryProvider,
-    )
-
-    NavDisplay(
-        entries = entries,
-        onBack = { popRoute() },
-    )
 
     conversationRenameTarget?.let { conversation ->
         var renameInput by remember(conversation.id) { mutableStateOf(conversation.title) }
         WindowDialog(
             show = true,
-            title = "重命名对话",
+            title = stringResource(R.string.conversation_rename_title),
             onDismissRequest = { conversationRenameTarget = null },
         ) {
             Column {
                 TextField(
                     value = renameInput,
                     onValueChange = { renameInput = it },
-                    label = "对话名称",
+                    label = stringResource(R.string.conversation_rename_hint),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 MiuixDialogActions(
-                    confirmText = "确定",
+                    confirmText = stringResource(R.string.action_save),
                     confirmEnabled = renameInput.isNotBlank(),
                     onCancel = { conversationRenameTarget = null },
                     onConfirm = {
@@ -509,12 +541,12 @@ fun AgentAppRoot(
     conversationDeleteTarget?.let { conversation ->
         WindowDialog(
             show = true,
-            title = "删除对话",
-            summary = "删除后，该对话将不可恢复",
+            title = stringResource(R.string.conversation_delete_title),
+            summary = stringResource(R.string.conversation_delete_message),
             onDismissRequest = { conversationDeleteTarget = null },
         ) {
             MiuixDialogActions(
-                confirmText = "删除",
+                confirmText = stringResource(R.string.action_delete),
                 destructive = true,
                 onCancel = { conversationDeleteTarget = null },
                 onConfirm = {
@@ -528,12 +560,20 @@ fun AgentAppRoot(
     messageDeleteTarget?.let { target ->
         WindowDialog(
             show = true,
-            title = "删除这轮对话",
-            summary = target.destructiveSummary("删除"),
+            title = stringResource(R.string.conversation_delete_message_title),
+            summary = if (target.laterTurnCount == 0) {
+                stringResource(R.string.conversation_delete_message_body)
+            } else {
+                pluralStringResource(
+                    R.plurals.conversation_delete_later_turns,
+                    target.laterTurnCount,
+                    target.laterTurnCount,
+                )
+            },
             onDismissRequest = { messageDeleteTarget = null },
         ) {
             MiuixDialogActions(
-                confirmText = "删除",
+                confirmText = stringResource(R.string.action_delete),
                 destructive = true,
                 onCancel = { messageDeleteTarget = null },
                 onConfirm = {
@@ -547,12 +587,20 @@ fun AgentAppRoot(
     messageRegenerateTarget?.let { target ->
         WindowDialog(
             show = true,
-            title = "重新生成回复",
-            summary = target.destructiveSummary("重新生成"),
+            title = stringResource(R.string.conversation_regenerate_title),
+            summary = if (target.laterTurnCount == 0) {
+                stringResource(R.string.conversation_regenerate_current_turn)
+            } else {
+                pluralStringResource(
+                    R.plurals.conversation_regenerate_later_turns,
+                    target.laterTurnCount,
+                    target.laterTurnCount,
+                )
+            },
             onDismissRequest = { messageRegenerateTarget = null },
         ) {
             MiuixDialogActions(
-                confirmText = "重新生成",
+                confirmText = stringResource(R.string.action_regenerate),
                 destructive = true,
                 onCancel = { messageRegenerateTarget = null },
                 onConfirm = {
@@ -567,11 +615,4 @@ fun AgentAppRoot(
 private data class MessageMutationTarget(
     val messageId: String,
     val laterTurnCount: Int,
-) {
-    fun destructiveSummary(action: String): String =
-        if (laterTurnCount == 0) {
-            "$action 后，当前轮次将不可恢复"
-        } else {
-            "$action 后，当前轮次及之后的 $laterTurnCount 轮对话将不可恢复"
-        }
-}
+)

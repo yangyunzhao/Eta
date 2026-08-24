@@ -17,6 +17,8 @@
 
 当前发布版本为 [`v2.6.0.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v2.6.0.znmlr.1)（`versionCode 26001`），编译期 Codex OAuth 开关默认启用。真机已完成普通问答、一次本地只读工具回合、覆盖安装和进程重启后的凭据恢复，以及固定 Codex 模型目录的 7 个可见模型拉取与切换调用。发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0`，并将模型目录 `client_version`、Responses Header 与 `ultra` 推理档位对齐到该协议基线。main 与 tag GitHub Actions 的完整单元测试、Android Lint、签名恢复、Debug/Release 构建、版本和签名校验均通过。用户没有也不需要 API Key，因此该人工网络验收不适用，原路径只采用自动回归且不发起 Platform API 请求。AndroidKeyStore instrumentation 因手机拒绝 USB 安装测试 APK而尚未实际执行，注销后的敏感日志计数也尚未完成，均作为本版本的已知验证缺口保留。
 
+本地 `main` 已合入上游 [`v2.6.2`](https://github.com/Mangi-11/Eta/releases/tag/v2.6.2)（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），当前下游构建基线为 `2.6.2.znmlr.1` / `versionCode 26201`。它尚未创建下游 tag 或 GitHub Release，需在完整验证后按发布规则单独进行。
+
 仓库已经加入下游 CI/发布防护：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，并精确核对 tag、APK 和版本 metadata，发布资产使用版本化名称。该流程不会自动创建 tag、GitHub Release 或执行 push；当前候选也尚未以工作流结果证明自动门禁全绿。详细发布步骤见 `.github/RELEASING.md`。
 
 相关文档：
@@ -30,7 +32,7 @@
 
 - `origin`：`https://github.com/yangyunzhao/Eta.git`，用于下游提交和推送。
 - `upstream`：`https://github.com/Mangi-11/Eta.git`，只用于获取上游更新。
-- 后续会持续获取上游更新；没有下游分叉时允许 fast-forward，已经产生下游分叉时使用普通 merge 保留双方历史，不改写已发布提交；同步上游后需重新运行相关测试。
+- 后续会持续获取上游更新；没有下游分叉时允许 fast-forward，已经产生下游分叉时使用普通 merge 保留双方历史，不改写已发布提交；最近一次本地同步为上游 `v2.6.2` / `bd4a14c`，同步后需重新运行相关测试。
 - 上游 README 的更新合入 `docs/README.md` 和 `docs/README_EN.md`，根 README 继续作为下游入口。
 - 上游许可证继续适用于本 Fork；使用、修改和分发前请阅读 [PolyForm Noncommercial License 1.0.0](LICENSE)。
 

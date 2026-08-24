@@ -51,6 +51,26 @@ Manifest 注册 `VoiceInteractionService`、独立进程的 `VoiceInteractionSes
 - **一圈即搜支持**：强制启用 `ContextualSearchManagerService`，将包名指向 Google App，并放行 `SystemUI` 与 ColorDirectService 的调用权限。作为一圈即搜的底层依赖始终执行，不可关闭。
 - **无障碍保护**：复用已验证的 `SystemServer.startOtherServices(TimingsTraceAndSlog)` 生命周期点，在系统服务启动完成后接入事件驱动保护。后台工作复用 Android `BackgroundThread`，不开模块线程、不轮询；开关默认关闭，开启请求需同时通过 signature 权限、真实发送 UID、服务声明与 APK signer 钉扎校验。保护只维护 owner 用户中的 Eta 组件和总开关，保留其他服务；断连时通过仅允许 `system` UID 调用的健康 Provider 确认，并对 Eta 做带次数上限和冷却的定向重绑。
 
+## 无障碍保护
+
+「强制保持无障碍」默认关闭。开启后，注入 `system_server` 的保护后端会校验 Eta 的服务声明、调用 UID 与 APK 签名，并在无障碍服务列表、总开关、Eta 安装包或 owner 用户解锁状态变化时校正配置。它保留其他无障碍服务，不依赖 App 自启动，也不执行周期轮询。
+
+如果服务仍在启用列表中但没有真实连接，保护后端只重启 Eta 自身，并最多逐步尝试三轮；持续失败后冷却一分钟。ColorOS 持续反删设置时，写回间隔会从 300 ms 退避到 30 秒，稳定一分钟后恢复。关闭开关只停止保护，不会替用户关闭当前服务。
+
+GUI 工具执行前仍会确认真实服务连接。保护未开启、system 作用域未生效或重绑超时时，本次动作会明确失败，不会改用 Root 或 Shell 偷偷修改无障碍设置。
+
+若 App 控制入口不可用，可用 ADB 停止保护后再从系统设置关闭服务：
+
+```bash
+adb shell settings put global eta_accessibility_protection_enabled 0
+```
+
+删除该设置会恢复默认关闭状态。开发阶段主动更换签名且确认 APK 来源可信时，还需清除旧 signer 钉扎值：
+
+```bash
+adb shell settings delete global eta_app_signer_sha256
+```
+
 ## SystemUI
 
 拦截底部手势条长按触发的 OPPO OCR 识屏，通过 binder 直接调用 `contextual_search` 服务触发一圈即搜。
@@ -79,7 +99,7 @@ ColorOS 系统记忆存在 `com.oplus.aimemory` 的 `ai_memory` 数据库中。E
 
 结果使用超级小爱的 `FlowTemplateToastCard` 在主线程流式更新，完成后通过其原生 TTS 入口朗读。卡片、取消、结果恢复和 Runtime handoff 都绑定已认领的对话 ID 与独立的 `xiaoai` source；不会全局屏蔽小爱的卡片、RN 数据或 TTS，也不共享小布适配器的状态。
 
-该版本目前只完成指定 APK 的静态云适配，尚未经过小米真机验证。构建、单元测试和目标签名存在只能证明静态兼容，不能替代 LSPosed 日志、真实进程、UI、TTS 与图片链路验证。
+该版本已通过小米真机验证。系统或 App 大版本更新后，仍需重新确认目标签名与完整链路。
 
 ## Google App
 
@@ -102,9 +122,11 @@ Google App 作为普通用户应用时，缺乏语音唤醒所需的系统权限
 
 ## 配置与实时生效
 
-模块 UI 基于 Miuix 0.9.3。配置链路如下：
+模块 UI 以 `gradle/libs.versions.toml` 声明的 Miuix 组件集为唯一版本事实源。配置链路如下：
 
-设置页与标准二级页面的顶栏使用 Miuix `LayerBackdrop` 捕获滚动内容并生成背景模糊；设备不支持 RuntimeShader 时回退为主题 `surface` 纯色。标准设置列表统一启用 Miuix 越界滚动和滚动末端触感反馈。
+根导航使用 Miuix `NavDisplay` 与可保存路由栈，横移返回开关实时控制各路由的 `swipeDismiss`；预测性返回开关通过 `ApplicationInfo` 的系统开关应用，并无转场重建主 Activity。首页会话列表保持在聊天舞台下层，通过双锚点横向拖动状态控制显露与收起；手势沿用 Compose 的方向仲裁和子组件优先级，不抢占消息滚动、横向代码块、附件栏或文本选择。设置页与标准二级页面共用自适应 Scaffold：手机显示可折叠大标题，宽屏改用小标题并将内容限制在居中的最大宽度内。界面缩放覆盖主 App 的 Compose Density，但宽屏判定保留缩放前 Density，避免缩放触发错误的手机/宽屏布局切换；系统助手浮层不应用界面缩放。
+
+外观配置保存在现有 `fuck_andes_settings` DataStore。主题根统一解析跟随系统、浅色、深色、Monet 色彩风格、强调色与纯黑背景，并同步系统栏和 Markdown 的 Material 颜色桥接。顶栏使用 Miuix `LayerBackdrop` 捕获滚动内容，可选择高斯或渐进模糊；关闭模糊时，顶栏与聊天输入区都回退为主题纯色表面。页面滚动继续使用 Miuix 越界回弹和边界触感反馈，横屏安全区由 display cutout 与导航栏 Insets 共同约束。
 
 - **Eta Runtime 配置**：默认思考、网页浏览、设备直达、敏感信息读取、敏感设备操作和终端/文件工具保存在 App 私有配置中，不依赖 LSPosed。Runtime 在请求开始和每次工具执行前读取当前值；升级时会兼容迁移已有 RemotePreferences 值。
 - **Hook 配置**：`FuckAndesApp` 在 `Application.onCreate` 注册 `XposedServiceHelper`，框架通过 `XposedProvider` 推送 binder 后拿到 `XposedService`。系统助手接管、Gemini 和一圈即搜等 Hook 开关通过 `XposedService.getRemotePreferences()` 写入 LSPosed 数据库；服务未连接时这些开关保持不可修改。
@@ -133,6 +155,32 @@ Runtime 提示要求模型在用户目标会明显受益于本机上下文时主
 
 运行时提示与工具描述共同要求模型每轮最多调用一次 `read_image`。需要查看多张图片时，模型必须先消费当前图片的视觉结果，再在下一轮读取下一张，避免同一请求携带多张工具图片导致部分 OpenAI 兼容服务长时间无响应。
 
+## 内置浏览器
+
+`browser_use` 是运行在 Eta 内的 Agent 浏览器，基于共享离屏 WebView，不是简单调用系统 `ACTION_VIEW`。它可以在不抢占前台的情况下加载 JavaScript 网页、提取保留标题/段落/列表/链接等结构的正文、查找并操作页面元素、提交表单、滚动和截图；用户想查看过程时，可在 App 中挂载同一个 WebView 直接接管。外部打开链接仍由独立的 `open_uri` 工具负责，两种能力不会混淆。
+
+Eta 不对浏览器请求执行额外的 URL、DNS、IP、主机数量、请求方法、重定向或 Service Worker 拦截，页面直接交给系统 WebView 加载。浏览器允许本地内容、混合内容、第三方 Cookie、自动媒体播放和表单提交；系统 WebView 与 Android 平台自身的协议支持、TLS 校验和权限行为保持不变。网页工具可在设置中关闭。
+
+## 终端与文件
+
+在用户授权下执行 `user` 或 `root` shell 命令，读写文件、列目录、跑脚本、查日志、改配置。会话式 shell 保持 cwd 和环境变量，异步任务后台执行并分段读取输出。聊天中的终端工具卡片可展开查看并复制实际执行的完整命令；运行日志仍只记录长度等受控摘要，不记录命令正文。
+
+终端按用途分为两个环境：
+
+- `android` 是原生 Android Shell，负责系统、应用、日志、Magisk 和设备文件操作。Root 会话会自动发现 Magisk、KernelSU 或 APatch 提供的 BusyBox，并以 standalone `ash` 补齐不在系统 PATH 中的 applet。
+- `linux` 是可选安装的 Alpine 工具环境，预装模型高频使用的 `rg`、`fd`、Git/SSH、diff/patch、curl、rsync、jq、SQLite、常用压缩工具与 Python 工具链。Eta 下载固定版本的官方 minirootfs 并校验 SHA-256，在 App 私有目录中解压，通过独立 mount namespace + Root chroot 运行；Linux 默认在映射到 Eta Android 工作目录的 `/workspace` 中执行，共享存储位于 `/sdcard`。它不是安全沙箱，也不会取代 Android 环境。
+
+聊天输入栏可以引用内部存储与 `/data/local/tmp` 下的文件或文件夹，发送后以附件名称和原始请求分开展示。Eta 只把经过 Root 校验的规范绝对路径写入模型上下文，不上传、不复制或缓存原文件；模型再按任务调用文件或终端工具读取。系统文件选择器会解析内部存储文档，以及能转换为本地媒体库路径的“最近”文件；云盘和其他只有 `content://` URI 的来源不会降级为上传。
+
+## 长期记忆
+
+跨对话长期记忆保存在 App 私有目录中的单一 `MEMORY.md`，不额外调用提取模型或运行后台整理任务。当前对话的主模型根据需要调用 `memory_get` 与 `memory_write`，负责去重、修正冲突和删除过期信息。
+
+- **按需注入**：每轮只自动提供预算内的 `# 核心记忆`、标题索引和文件 revision；详细章节由模型按任务检索，不把整个文件反复塞进上下文
+- **动态预算**：核心注入量根据当前模型上下文窗口计算；窗口未知时按 128K 处理，并始终为历史、工具、图片和回复预留空间
+- **原子更新**：文件上限为 1 MiB UTF-8 字节，模型使用 revision 进行局部更新，冲突时必须重新读取；完整文件通过 `AtomicFile` 覆盖，失败保留旧内容
+- **用户控制**：设置页可查看用量、编辑完整 Markdown、清空或关闭记忆；关闭不会删除文件，但 Runtime 会立即停止注入并拒绝新的记忆工具调用
+
 ## 会话级 Thinking Effort
 
 聊天会话保存独立的 `ReasoningEffort`，输入栏按当前 Provider、端点和模型能力显示 `Thinking · Off / Default / Low / Medium / High / XHigh / Max` 的实际子集。模型不支持推理时不显示入口；强制推理且没有可调档位的模型只显示不可点击的 `Thinking · Default`。模型切换或远端能力刷新后，已保存但不再合法的档位会向下裁剪到最近的有效档位，没有可比档位时回到 `Default`。
@@ -141,7 +189,7 @@ Runtime 提示要求模型在用户目标会明显受益于本机上下文时主
 
 ## 聊天流式渲染
 
-模型的 SSE 文本增量先在 App 状态层按 50 ms 合并，减少高频列表状态写入；思考、工具调用和块边界事件仍会立即刷新，事件顺序不变。聊天渲染使用增量 Markdown AST，但不会把尚未显示的大段网络 backlog 一次性交给布局：解析器每次最多追加 12 个 Unicode 字素，批与批之间让出一拍供重组排版，供给节奏与显现速度解耦；消息高度始终由显现进度驱动，解析领先不会提前撑高回答。
+模型的 SSE 文本增量先在 App 状态层按 50 ms 合并，减少高频列表状态写入；思考、工具调用和块边界事件仍会立即刷新，事件顺序不变。聊天渲染使用增量 Markdown AST，但不会把尚未显示的大段网络 backlog 一次性交给布局：解析器每次最多追加 12 个 Unicode 字素，批与批之间让出一拍供重组排版，供给节奏与显现速度解耦；消息高度始终由显现进度驱动，解析领先不会提前撑高回答。输入器使用 state-based `TextFieldState` 在组件内持有编辑缓冲区，逐字编辑不会回写聊天页面状态，也不经过旧版 `CoreTextField` 管线。
 
 逐字效果由单个回答级帧时钟驱动。段落、标题、代码块和表格单元格先完成一次真实排版，再由 `DrawModifierNode` 按字素边界裁剪 `TextLayoutResult`；帧间推进只使绘制失效，不重建 Markdown AST、`AnnotatedString` 或文本布局。显现速度随积压自适应（48–240 字素/秒），积压时允许单帧补多个字素，避免输出稳定滞后于模型。行内语法闭合（加粗、行内代码、链接折叠）导致渲染文本变短时，显现进度保持单调前进，不回退重打已显示的文字。前缀路径按字素增量累计，只有显现跨入新行时才触发一次测量并增加消息高度，因此隐藏文本不会提前把当前回答顶出视口。Emoji ZWJ、肤色修饰、组合音标、国旗和代理对均作为完整字素显示，不会从 UTF-16 中间断开。
 

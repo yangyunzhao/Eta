@@ -13,7 +13,7 @@
 - OAuth access token、refresh token 和 ID token 不进入 Room Provider 表、RemotePreferences、Binder Bundle、日志或崩溃信息。
 - 现有 API Key Provider 必须保持兼容，数据库升级不能改变既有 Provider 的认证行为。
 
-> **实施状态（2026-08-15）：** Tasks 1–12 已发布为 `v2.6.0.znmlr.1`（`versionCode 26001`），包括核心认证、Codex Responses 传输、固定 OAuth 模型目录、Provider 设备码设置页和编译期开关。真机已验证设备码登录、最小问答、一次本地只读工具回合、进程重启凭据恢复、7 个模型拉取及切换调用。发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0`（peeled commit `be6e8eac029b183056b7e4402879f15d2c85f61b`），并将模型目录 `client_version`、Responses Header 与 `ultra` 推理档位对齐到该协议基线。main 与 tag GitHub Actions 的完整单元测试、Android Lint、签名构建和产物校验均通过。用户没有也不需要 API Key，该人工网络验收不适用。AndroidKeyStore instrumentation 和注销后的敏感日志计数尚未完成，作为已知验证缺口保留。
+> **实施状态（2026-08-24）：** `v2.6.0.znmlr.1`（`versionCode 26001`）已发布，包括核心认证、Codex Responses 传输、固定 OAuth 模型目录、Provider 设备码设置页和编译期开关。真机已验证设备码登录、最小问答、一次本地只读工具回合、进程重启凭据恢复、7 个模型拉取及切换调用。发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0`（peeled commit `be6e8eac029b183056b7e4402879f15d2c85f61b`），并将模型目录 `client_version`、Responses Header 与 `ultra` 推理档位对齐到该协议基线。当前本地 `main` 已合入上游 `v2.6.2`（`bd4a14c`），构建基线为未发布的 `2.6.2.znmlr.1` / `26201`；本次合并同时将 Room schema 升至 v16，以兼容已发布下游 OAuth v15 与上游模型能力覆盖 v15 的两种历史数据库。AndroidKeyStore instrumentation 和注销后的敏感日志计数尚未完成，作为已知验证缺口保留。
 
 下游 CI/发布防护已经实现并通过代码审查：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，精确校验 tag、APK 和版本 metadata，并使用版本化资产名。该流程不会自动创建 tag、GitHub Release 或执行 push，也不会把未通过的门禁或 Task 9 人工验收视为成功。
 

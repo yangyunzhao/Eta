@@ -31,8 +31,8 @@ val codexOAuthEnabled = rawCodexOAuthBuildProperty
     }
     .orElse(true)
 
-val upstreamVersionName = "2.6.0"
-val upstreamVersionCode = 260
+val upstreamVersionName = "2.6.2"
+val upstreamVersionCode = 262
 val downstreamReleaseSequence = 1
 val downstreamVersionLabel = "znmlr"
 val downstreamVersionCodeMultiplier = 100
@@ -127,6 +127,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
+            isPseudoLocalesEnabled = true
         }
         release {
             signingConfig = signingConfigs.findByName("release")
@@ -147,6 +148,10 @@ android {
     buildFeatures {
         buildConfig = true
         compose = true
+    }
+
+    androidResources {
+        localeFilters += listOf("en", "b+zh+Hans", "b+zh+Hant")
     }
 
     packaging {
@@ -177,15 +182,18 @@ dependencies {
     implementation(libs.libxposed.service)
     implementation(libs.miuix.ui)
     implementation(libs.miuix.blur)
+    implementation(libs.miuix.icons)
+    implementation(libs.miuix.nav)
     implementation(libs.miuix.preference)
-    implementation(libs.miuix.navigation3.ui)
     implementation(libs.lucide.icons)
-    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigationevent)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.activity.compose)
     implementation(libs.markdown.renderer)
     implementation(libs.markdown.renderer.m3)
     // markdown-renderer-m3 将 material3 作为 compileOnly，需显式引入以满足运行时依赖
     implementation(libs.material3)
+    implementation(libs.hidden.api.bypass)
 
     // DataStore：Provider / Model 结构化 JSON 与当前选中 ID 等键值
     implementation(libs.datastore.preferences)

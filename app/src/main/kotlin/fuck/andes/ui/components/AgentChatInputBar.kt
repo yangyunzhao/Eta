@@ -1,4 +1,6 @@
 package fuck.andes.ui.components
+import fuck.andes.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -12,7 +14,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,12 +62,13 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.R as LucideR
 import fuck.andes.data.model.ReasoningEffort
+import fuck.andes.ui.model.AgentContextUsageUi
+import fuck.andes.ui.model.AgentModelPickerUiState
 import fuck.andes.ui.model.PendingFileReferenceUi
 import fuck.andes.ui.model.PendingImageUi
 import top.yukonga.miuix.kmp.basic.DropdownImpl
@@ -79,17 +85,21 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowListPopup
 import kotlin.math.roundToInt
 
-private val InputIconSize = 20.dp
-private val SendButtonVisualSize = 32.dp
-private val ThinkingChipShape = RoundedCornerShape(percent = 50)
+private val SendButtonVisualSize = ChatInputActionIconSize
+private val SendIconSize = 16.dp
+private val StopIconSize = 10.dp
+private val ThinkingIconSize = 21.dp
 private val InputContainerShape = RoundedCornerShape(20.dp)
 
 /**
  * Agent 输入器始终保持同一空间结构，聚焦、输入和执行过程只改变状态，不搬动操作入口。
  */
 @Composable
-fun AgentChatInputBar(
+internal fun AgentChatInputBar(
     input: String,
+    modelPickerState: AgentModelPickerUiState,
+    contextUsage: AgentContextUsageUi,
+    showContextUsage: Boolean,
     isStreaming: Boolean,
     reasoningEffort: ReasoningEffort,
     availableReasoningEfforts: List<ReasoningEffort>,
@@ -98,6 +108,7 @@ fun AgentChatInputBar(
     isEditingMessage: Boolean,
     editHasLaterTurns: Boolean,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onModelSelected: (String) -> Unit,
     onSubmit: (String) -> Unit,
     onStop: () -> Unit,
     onAttachImage: (String) -> Unit,
@@ -111,9 +122,9 @@ fun AgentChatInputBar(
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
-    var textFieldValue by remember { mutableStateOf(TextFieldValue(input)) }
+    val textFieldState = rememberTextFieldState(initialText = input)
     var wasEditingMessage by remember { mutableStateOf(isEditingMessage) }
-    val canSend = textFieldValue.text.isNotBlank() ||
+    val canSend = textFieldState.text.isNotBlank() ||
         pendingImages.isNotEmpty() ||
         pendingFileReferences.isNotEmpty()
     val density = LocalDensity.current
@@ -128,7 +139,7 @@ fun AgentChatInputBar(
         // 编辑态由外部业务状态驱动；普通输入只保留在本地，避免每个字符把聊天舞台
         // 的消息流、滚动和 Markdown 一起带入重组。
         if (isEditingMessage || wasEditingMessage) {
-            textFieldValue = TextFieldValue(input)
+            textFieldState.setTextAndPlaceCursorAtEnd(input)
         }
         if (isEditingMessage) {
             focusRequester.requestFocus()
@@ -140,7 +151,7 @@ fun AgentChatInputBar(
     LaunchedEffect(isStreaming) {
         if (isStreaming) {
             // 发送按钮、建议词和外部恢复都可能启动流式任务，统一清掉本地草稿。
-            textFieldValue = TextFieldValue()
+            textFieldState.clearText()
         }
     }
 
@@ -179,9 +190,9 @@ fun AgentChatInputBar(
         ) {
             Text(
                 text = if (editHasLaterTurns) {
-                    "发送后将替换此消息及之后内容"
+                    stringResource(R.string.chat_edit_replace_later)
                 } else {
-                    "发送后将替换此消息"
+                    stringResource(R.string.chat_edit_replace_message)
                 },
                 style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -225,16 +236,15 @@ fun AgentChatInputBar(
                         .padding(horizontal = 8.dp, vertical = 5.dp),
                     contentAlignment = Alignment.TopStart,
                 ) {
-                    if (textFieldValue.text.isBlank()) {
+                    if (textFieldState.text.isBlank()) {
                         Text(
-                            text = if (isStreaming) "Eta 正在执行…" else "交给 Eta 去完成",
+                            text = if (isStreaming) stringResource(R.string.chat_eta_working) else stringResource(R.string.chat_input_hint),
                             style = MiuixTheme.textStyles.body1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
                     BasicTextField(
-                        value = textFieldValue,
-                        onValueChange = { textFieldValue = it },
+                        state = textFieldState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(focusRequester),
@@ -245,8 +255,10 @@ fun AgentChatInputBar(
                             lineHeight = 22.sp,
                         ),
                         cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
-                        maxLines = 6,
-                        minLines = 1,
+                        lineLimits = TextFieldLineLimits.MultiLine(
+                            minHeightInLines = 1,
+                            maxHeightInLines = 6,
+                        ),
                     )
                 }
 
@@ -254,110 +266,124 @@ fun AgentChatInputBar(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (isEditingMessage) {
-                        IconButton(
-                            onClick = onCancelMessageEdit,
-                            minWidth = 38.dp,
-                            minHeight = 38.dp,
-                        ) {
-                            Icon(
-                                painter = painterResource(LucideR.drawable.lucide_ic_x),
-                                contentDescription = "取消编辑",
-                                modifier = Modifier.size(InputIconSize),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                            )
-                        }
-                    } else {
-                        AgentAttachmentPickerButton(
-                            popupAnchorTopPx = inputContainerTopPx,
-                            popupMaxHeight = thinkingPopupMaxHeight,
-                            onAttachImage = onAttachImage,
-                            onAttachFiles = onAttachFiles,
-                            onAttachFolder = onAttachFolder,
-                            onAttachFilePath = onAttachFilePath,
-                        )
-
-                        Spacer(modifier = Modifier.width(2.dp))
-
-                        if (availableReasoningEfforts.isNotEmpty()) {
-                            ThinkingEffortChip(
-                                effort = reasoningEffort,
-                                options = availableReasoningEfforts,
-                                enabled = !isStreaming,
+                        if (isEditingMessage) {
+                            IconButton(
+                                onClick = onCancelMessageEdit,
+                                minWidth = ChatInputActionSize,
+                                minHeight = ChatInputActionSize,
+                            ) {
+                                Icon(
+                                    painter = painterResource(LucideR.drawable.lucide_ic_x),
+                                    contentDescription = stringResource(R.string.ui_cancel_edit_c698df),
+                                    modifier = Modifier.size(ChatInputActionIconSize),
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                )
+                            }
+                        } else {
+                            AgentAttachmentPickerButton(
                                 popupAnchorTopPx = inputContainerTopPx,
                                 popupMaxHeight = thinkingPopupMaxHeight,
-                                onEffortChange = onReasoningEffortChange,
+                                onAttachImage = onAttachImage,
+                                onAttachFiles = onAttachFiles,
+                                onAttachFolder = onAttachFolder,
+                                onAttachFilePath = onAttachFilePath,
                             )
-                        }
-                    }
 
-                    Spacer(modifier = Modifier.weight(1f))
+                            Spacer(modifier = Modifier.width(2.dp))
 
-                    IconButton(
-                        onClick = if (isStreaming) {
-                            onStop
-                        } else {
-                            {
-                                if (canSend) {
-                                    val submittedText = textFieldValue.text
-                                    textFieldValue = TextFieldValue()
-                                    onSubmit(submittedText)
-                                }
-                            }
-                        },
-                        enabled = isStreaming || canSend,
-                        minWidth = 38.dp,
-                        minHeight = 38.dp,
-                    ) {
-                        // The 38dp outer button remains easy to hit; only the visible
-                        // circle is reduced so it has the same optical weight as the
-                        // adjacent toolbar icons.
-                        val sendButtonColor by animateColorAsState(
-                            targetValue = when {
-                                isStreaming -> MiuixTheme.colorScheme.onSurface
-                                canSend -> MiuixTheme.colorScheme.primary
-                                else -> MiuixTheme.colorScheme.surfaceContainerHigh
-                            },
-                            animationSpec = tween(durationMillis = 160),
-                            label = "send_button_color",
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(SendButtonVisualSize)
-                                .clip(CircleShape)
-                                .background(sendButtonColor),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            AnimatedContent(
-                                targetState = isStreaming,
-                                transitionSpec = {
-                                    (fadeIn(tween(130)) + scaleIn(tween(160), initialScale = 0.72f))
-                                        .togetherWith(
-                                            fadeOut(tween(90)) +
-                                                scaleOut(tween(110), targetScale = 0.72f)
-                                        )
-                                },
-                                label = "send_stop_icon",
-                            ) { streaming ->
-                                Icon(
-                                    painter = painterResource(
-                                        if (streaming) {
-                                            LucideR.drawable.lucide_ic_square
-                                        } else {
-                                            LucideR.drawable.lucide_ic_arrow_up
-                                        }
-                                    ),
-                                    contentDescription = if (streaming) "停止" else "发送",
-                                    modifier = Modifier.size(if (streaming) 12.dp else 17.dp),
-                                    tint = when {
-                                        streaming -> MiuixTheme.colorScheme.surface
-                                        canSend -> MiuixTheme.colorScheme.onPrimary
-                                        else -> MiuixTheme.colorScheme.onSurfaceVariantActions
-                                    },
+                            if (availableReasoningEfforts.isNotEmpty()) {
+                                ThinkingEffortChip(
+                                    effort = reasoningEffort,
+                                    options = availableReasoningEfforts,
+                                    enabled = !isStreaming,
+                                    popupAnchorTopPx = inputContainerTopPx,
+                                    popupMaxHeight = thinkingPopupMaxHeight,
+                                    onEffortChange = onReasoningEffortChange,
                                 )
                             }
                         }
-                    }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        if (showContextUsage) {
+                            AgentContextUsageButton(usage = contextUsage)
+
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+
+                        AgentModelPickerButton(
+                            state = modelPickerState,
+                            isStreaming = isStreaming,
+                            popupAnchorTopPx = inputContainerTopPx,
+                            popupMaxHeight = thinkingPopupMaxHeight,
+                            onModelSelected = onModelSelected,
+                        )
+
+                        IconButton(
+                            onClick = if (isStreaming) {
+                                onStop
+                            } else {
+                                {
+                                    if (canSend) {
+                                        val submittedText = textFieldState.text.toString()
+                                        textFieldState.clearText()
+                                        onSubmit(submittedText)
+                                    }
+                                }
+                            },
+                            enabled = isStreaming || canSend,
+                            minWidth = ChatInputActionSize,
+                            minHeight = ChatInputActionSize,
+                        ) {
+                            // 保留统一的点击区域，仅让可见圆形与相邻操作图标保持同一尺寸。
+                            val sendButtonColor by animateColorAsState(
+                                targetValue = when {
+                                    isStreaming -> MiuixTheme.colorScheme.onSurface
+                                    canSend -> MiuixTheme.colorScheme.primary
+                                    else -> MiuixTheme.colorScheme.surfaceContainerHigh
+                                },
+                                animationSpec = tween(durationMillis = 160),
+                                label = "send_button_color",
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(SendButtonVisualSize)
+                                    .clip(CircleShape)
+                                    .background(sendButtonColor),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                AnimatedContent(
+                                    targetState = isStreaming,
+                                    transitionSpec = {
+                                        (fadeIn(tween(130)) + scaleIn(tween(160), initialScale = 0.72f))
+                                            .togetherWith(
+                                                fadeOut(tween(90)) +
+                                                    scaleOut(tween(110), targetScale = 0.72f)
+                                            )
+                                    },
+                                    label = "send_stop_icon",
+                                ) { streaming ->
+                                    Icon(
+                                        painter = painterResource(
+                                            if (streaming) {
+                                                LucideR.drawable.lucide_ic_square
+                                            } else {
+                                                LucideR.drawable.lucide_ic_arrow_up
+                                            }
+                                        ),
+                                        contentDescription = if (streaming) stringResource(R.string.chat_stop) else stringResource(R.string.chat_send),
+                                        modifier = Modifier.size(
+                                            if (streaming) StopIconSize else SendIconSize
+                                        ),
+                                        tint = when {
+                                            streaming -> MiuixTheme.colorScheme.surface
+                                            canSend -> MiuixTheme.colorScheme.onPrimary
+                                            else -> MiuixTheme.colorScheme.onSurfaceVariantActions
+                                        },
+                                    )
+                                }
+                            }
+                        }
                 }
             }
         }
@@ -365,9 +391,7 @@ fun AgentChatInputBar(
 
 }
 
-/**
- * 思考强度选择：启用推理时填充主色淡底，Off 保持描边线框。
- */
+/** 思考强度选择保持为单一图标，当前状态仅通过图标颜色表达。 */
 @Composable
 private fun ThinkingEffortChip(
     effort: ReasoningEffort,
@@ -396,45 +420,18 @@ private fun ThinkingEffortChip(
         animationSpec = tween(durationMillis = 160),
         label = "thinking_content",
     )
-    val backgroundColor by animateColorAsState(
-        targetValue = if (active) {
-            MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)
-        } else {
-            Color.Transparent
-        },
-        animationSpec = tween(durationMillis = 160),
-        label = "thinking_background",
-    )
-    val outlineColor by animateColorAsState(
-        targetValue = if (active) {
-            Color.Transparent
-        } else {
-            MiuixTheme.colorScheme.outline.copy(alpha = 0.6f)
-        },
-        animationSpec = tween(durationMillis = 160),
-        label = "thinking_outline",
-    )
     Box(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .clip(ThinkingChipShape)
-                .background(backgroundColor)
-                .border(0.5.dp, outlineColor, ThinkingChipShape)
-                .clickable(enabled = menuEnabled) { showPopup = true }
-                .padding(horizontal = 11.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        IconButton(
+            onClick = { showPopup = true },
+            enabled = menuEnabled,
+            minWidth = ChatInputActionSize,
+            minHeight = ChatInputActionSize,
         ) {
             Icon(
                 painter = painterResource(LucideR.drawable.lucide_ic_atom),
-                contentDescription = null,
-                modifier = Modifier.size(13.dp),
+                contentDescription = stringResource(R.string.chat_reasoning_effort, effort.displayName),
+                modifier = Modifier.size(ThinkingIconSize),
                 tint = contentColor,
-            )
-            Spacer(modifier = Modifier.width(5.dp))
-            Text(
-                text = "Thinking · ${effort.displayName}",
-                style = MiuixTheme.textStyles.footnote1,
-                color = contentColor,
             )
         }
         WindowListPopup(
@@ -507,7 +504,7 @@ private fun PendingImageStrip(
                 ) {
                     Icon(
                         painter = painterResource(LucideR.drawable.lucide_ic_x),
-                        contentDescription = "移除图片",
+                        contentDescription = stringResource(R.string.ui_remove_image_089db3),
                         modifier = Modifier.size(11.dp),
                         tint = Color.White,
                     )

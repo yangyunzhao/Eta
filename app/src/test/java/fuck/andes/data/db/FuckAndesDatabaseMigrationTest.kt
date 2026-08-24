@@ -10,6 +10,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -20,7 +21,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class FuckAndesDatabaseMigrationTest {
     @Test
-    fun migration6To15PreservesDataAndMovesBoundedConversationContext() {
+    fun migration6To16PreservesDataAndMovesBoundedConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
@@ -36,6 +37,7 @@ class FuckAndesDatabaseMigrationTest {
                 FuckAndesDatabase.MIGRATION_12_13,
                 FuckAndesDatabase.MIGRATION_13_14,
                 FuckAndesDatabase.MIGRATION_14_15,
+                FuckAndesDatabase.MIGRATION_15_16,
             )
             .build()
         try {
@@ -81,7 +83,7 @@ class FuckAndesDatabaseMigrationTest {
                 database.conversationDao().messages().single()
             }
 
-            assertEquals(15, databaseVersion)
+            assertEquals(16, databaseVersion)
             assertEquals("保留的结果", result.content)
             assertEquals("[]", result.transcriptJson)
             assertEquals("保留的归档", archive.content)
@@ -106,6 +108,9 @@ class FuckAndesDatabaseMigrationTest {
             assertEquals("sk-existing", migratedProvider.second)
             assertEquals(false, provider.hostedWebSearchEnabled)
             assertEquals(false, migratedMessage.isEdited)
+            assertEquals(null, provider.models.first().contextWindowOverride)
+            assertEquals(null, provider.models.first().reasoningOverride)
+            assertEquals(null, provider.models.first().reasoningCapabilitiesOverride)
             assertEquals(
                 listOf(ModelSource.CATALOG, ModelSource.MANUAL),
                 provider.models.map { it.source },
@@ -113,6 +118,53 @@ class FuckAndesDatabaseMigrationTest {
         } finally {
             database.close()
             context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun migration15To16KeepsDownstreamAuthModeAndAddsUpstreamOverrides() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val helper = createVersion15Database(
+            context = context,
+            databaseName = "migration-downstream-v15-${UUID.randomUUID()}.db",
+            hasAuthMode = true,
+            hasOverrides = false,
+        )
+        try {
+            val database = helper.writableDatabase
+            FuckAndesDatabase.MIGRATION_15_16.migrate(database)
+
+            assertEquals("codex_oauth", queryString(database, "SELECT auth_mode FROM model_providers"))
+            assertNull(queryString(database, "SELECT context_window_override FROM provider_models"))
+            assertNull(queryString(database, "SELECT reasoning_override FROM provider_models"))
+            assertEquals("null", queryString(database, "SELECT reasoning_capabilities_override_json FROM provider_models"))
+        } finally {
+            helper.close()
+        }
+    }
+
+    @Test
+    fun migration15To16KeepsUpstreamOverridesAndAddsDownstreamAuthMode() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val helper = createVersion15Database(
+            context = context,
+            databaseName = "migration-upstream-v15-${UUID.randomUUID()}.db",
+            hasAuthMode = false,
+            hasOverrides = true,
+        )
+        try {
+            val database = helper.writableDatabase
+            FuckAndesDatabase.MIGRATION_15_16.migrate(database)
+
+            assertEquals("", queryString(database, "SELECT auth_mode FROM model_providers"))
+            assertEquals("262144", queryString(database, "SELECT context_window_override FROM provider_models"))
+            assertEquals("1", queryString(database, "SELECT reasoning_override FROM provider_models"))
+            assertEquals("{\"supportedEfforts\":[\"high\"]}", queryString(
+                database,
+                "SELECT reasoning_capabilities_override_json FROM provider_models",
+            ))
+        } finally {
+            helper.close()
         }
     }
 
@@ -210,6 +262,65 @@ class FuckAndesDatabaseMigrationTest {
                 helper.close()
             }
     }
+
+    private fun createVersion15Database(
+        context: Context,
+        databaseName: String,
+        hasAuthMode: Boolean,
+        hasOverrides: Boolean,
+    ): SupportSQLiteOpenHelper {
+        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(databaseName)
+            .callback(
+                object : SupportSQLiteOpenHelper.Callback(15) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL(
+                            "CREATE TABLE model_providers (id TEXT NOT NULL PRIMARY KEY" +
+                                (if (hasAuthMode) ", auth_mode TEXT NOT NULL DEFAULT ''" else "") +
+                                ")",
+                        )
+                        db.execSQL(
+                            "CREATE TABLE provider_models (id TEXT NOT NULL PRIMARY KEY" +
+                                (if (hasOverrides) {
+                                    ", context_window_override INTEGER, reasoning_override INTEGER, " +
+                                        "reasoning_capabilities_override_json TEXT NOT NULL DEFAULT 'null'"
+                                } else {
+                                    ""
+                                }) +
+                                ")",
+                        )
+                        if (hasAuthMode) {
+                            db.execSQL("INSERT INTO model_providers (id, auth_mode) VALUES ('provider', 'codex_oauth')")
+                        } else {
+                            db.execSQL("INSERT INTO model_providers (id) VALUES ('provider')")
+                        }
+                        if (hasOverrides) {
+                            db.execSQL(
+                                "INSERT INTO provider_models " +
+                                    "(id, context_window_override, reasoning_override, reasoning_capabilities_override_json) " +
+                                    "VALUES ('model', 262144, 1, '{\"supportedEfforts\":[\"high\"]}')",
+                            )
+                        } else {
+                            db.execSQL("INSERT INTO provider_models (id) VALUES ('model')")
+                        }
+                    }
+
+                    override fun onUpgrade(
+                        db: SupportSQLiteDatabase,
+                        oldVersion: Int,
+                        newVersion: Int,
+                    ) = Unit
+                },
+            )
+            .build()
+        return FrameworkSQLiteOpenHelperFactory().create(configuration).also { it.writableDatabase }
+    }
+
+    private fun queryString(database: SupportSQLiteDatabase, sql: String): String? =
+        database.query(sql).use { cursor ->
+            check(cursor.moveToFirst())
+            if (cursor.isNull(0)) null else cursor.getString(0)
+        }
 
     private companion object {
         fun providerModelInsert(id: String, modelId: String, builtIn: Int, sortOrder: Int): String =

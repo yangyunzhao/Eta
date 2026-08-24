@@ -6,6 +6,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -20,7 +21,7 @@ import androidx.room.migration.Migration
         RuntimeArchiveEventEntity::class,
         SkillRegistryEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = false,
 )
 internal abstract class FuckAndesDatabase : RoomDatabase() {
@@ -50,6 +51,7 @@ internal abstract class FuckAndesDatabase : RoomDatabase() {
                         MIGRATION_12_13,
                         MIGRATION_13_14,
                         MIGRATION_14_15,
+                        MIGRATION_15_16,
                     )
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
@@ -164,6 +166,58 @@ internal abstract class FuckAndesDatabase : RoomDatabase() {
             database.execSQL(
                 "ALTER TABLE model_providers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT ''"
             )
+        }
+
+        /**
+         * v15 already shipped with two different schemas: downstream added provider auth_mode,
+         * while upstream added per-model overrides.  Add whichever columns are absent so both
+         * installation histories reach the single v16 schema.
+         */
+        internal val MIGRATION_15_16 = Migration(15, 16) { database ->
+            addColumnIfMissing(
+                database,
+                table = "model_providers",
+                column = "auth_mode",
+                sql = "ALTER TABLE model_providers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT ''",
+            )
+            addColumnIfMissing(
+                database,
+                table = "provider_models",
+                column = "context_window_override",
+                sql = "ALTER TABLE provider_models ADD COLUMN context_window_override INTEGER",
+            )
+            addColumnIfMissing(
+                database,
+                table = "provider_models",
+                column = "reasoning_override",
+                sql = "ALTER TABLE provider_models ADD COLUMN reasoning_override INTEGER",
+            )
+            addColumnIfMissing(
+                database,
+                table = "provider_models",
+                column = "reasoning_capabilities_override_json",
+                sql = "ALTER TABLE provider_models ADD COLUMN " +
+                    "reasoning_capabilities_override_json TEXT NOT NULL DEFAULT 'null'",
+            )
+        }
+
+        private fun addColumnIfMissing(
+            database: SupportSQLiteDatabase,
+            table: String,
+            column: String,
+            sql: String,
+        ) {
+            if (!hasColumn(database, table, column)) database.execSQL(sql)
+        }
+
+        private fun hasColumn(
+            database: SupportSQLiteDatabase,
+            table: String,
+            column: String,
+        ): Boolean = database.query("PRAGMA table_info($table)").use { cursor ->
+            val nameColumn = cursor.getColumnIndexOrThrow("name")
+            generateSequence { if (cursor.moveToNext()) cursor.getString(nameColumn) else null }
+                .any { it == column }
         }
     }
 }

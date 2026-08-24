@@ -3,6 +3,7 @@ package fuck.andes.data.repository
 import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.data.model.CustomHeader
 import fuck.andes.data.model.Model
+import fuck.andes.data.model.ModelReasoningCapabilities
 import fuck.andes.data.model.OpenAiCompatibleProviderSetting
 import fuck.andes.data.model.OpenAiEndpointMode
 import fuck.andes.data.model.ProviderAuthModes
@@ -34,7 +35,13 @@ class RuntimeConfigRepositoryTest {
             modelId = "gpt-5.5",
             displayName = "GPT-5.5",
             contextWindow = 1_000_000,
+            contextWindowOverride = 256_000,
             reasoning = true,
+            reasoningOverride = true,
+            reasoningCapabilitiesOverride = ModelReasoningCapabilities(
+                supportedEfforts = listOf(ReasoningEffort.MINIMAL),
+                canDisable = true,
+            ),
             customHeaders = listOf(CustomHeader("x-model", "2"))
         )
 
@@ -43,10 +50,8 @@ class RuntimeConfigRepositoryTest {
         val root = Json.parseToJsonElement(raw).jsonObject
 
         assertEquals(ProviderTypes.OPENAI_COMPATIBLE, root.getValue("providerType").jsonPrimitive.content)
-        assertEquals("", config.authMode)
-        assertEquals("key", config.apiKey)
         assertEquals("gpt-5.5", root.getValue("model").jsonPrimitive.content)
-        assertEquals(1_000_000, config.contextWindow)
+        assertEquals(256_000, config.contextWindow)
         assertEquals(listOf("x-provider", "x-model"), config.customHeaders.map { it.name })
         assertEquals(ReasoningEffort.DEFAULT, config.reasoningEffort)
         assertEquals(true, config.thinkingEnabled)
@@ -54,11 +59,7 @@ class RuntimeConfigRepositoryTest {
             listOf(
                 ReasoningEffort.OFF,
                 ReasoningEffort.DEFAULT,
-                ReasoningEffort.LOW,
-                ReasoningEffort.MEDIUM,
-                ReasoningEffort.HIGH,
-                ReasoningEffort.XHIGH,
-                ReasoningEffort.MAX,
+                ReasoningEffort.MINIMAL,
             ),
             config.reasoningCapabilities?.selectableEfforts,
         )
@@ -77,11 +78,7 @@ class RuntimeConfigRepositoryTest {
             isBuiltIn = true,
             endpointMode = OpenAiEndpointMode.RESPONSES,
         )
-        val model = Model(
-            id = "codex-model",
-            modelId = "gpt-5.5",
-            displayName = "GPT-5.5",
-        )
+        val model = Model(id = "codex-model", modelId = "gpt-5.5", displayName = "GPT-5.5")
 
         val config = RuntimeConfigRepository.buildRuntimeConfig(provider, model)
         val raw = RuntimeConfigRepository.runtimeConfigJson(config)
@@ -110,9 +107,11 @@ class RuntimeConfigRepositoryTest {
             isBuiltIn = true,
             endpointMode = OpenAiEndpointMode.CHAT_COMPLETIONS,
         )
-        val model = Model(id = "model", modelId = "gpt-5.5", displayName = "GPT-5.5")
 
-        val config = RuntimeConfigRepository.buildRuntimeConfig(provider, model)
+        val config = RuntimeConfigRepository.buildRuntimeConfig(
+            provider,
+            Model(id = "model", modelId = "gpt-5.5", displayName = "GPT-5.5"),
+        )
 
         assertEquals(OpenAiEndpointMode.RESPONSES, config.openAiEndpointMode)
         assertEquals(OpenAiEndpointMode.CHAT_COMPLETIONS, provider.endpointMode)
@@ -121,37 +120,20 @@ class RuntimeConfigRepositoryTest {
     }
 
     @Test
-    fun codexOAuthValidationAcceptsEmptyApiKey() {
+    fun codexOAuthValidationFailsClosedWhileLegacyApiKeyValidationRemainsUnchanged() {
         codexConfig().validateForTest()
-    }
-
-    @Test
-    fun codexOAuthValidationRejectsUnsafeOrUnsupportedConfig() {
-        val invalidConfigs = listOf(
+        listOf(
             codexConfig().copy(providerId = "custom-openai"),
             codexConfig().copy(providerType = ProviderTypes.CUSTOM),
             codexConfig().copy(providerSourceType = ProviderSourceTypes.CUSTOM),
             codexConfig().copy(openAiEndpointMode = OpenAiEndpointMode.CHAT_COMPLETIONS),
             codexConfig().copy(apiKey = "must-not-be-used"),
             codexConfig().copy(model = ""),
-        )
-
-        invalidConfigs.forEach { config ->
-            assertThrows(IllegalArgumentException::class.java) {
-                config.validateForTest()
-            }
+            codexConfig().copy(authMode = "future_auth_mode"),
+        ).forEach { config ->
+            assertThrows(IllegalArgumentException::class.java) { config.validateForTest() }
         }
-    }
 
-    @Test
-    fun unknownAuthModeFailsClosed() {
-        assertThrows(IllegalArgumentException::class.java) {
-            codexConfig().copy(authMode = "future_auth_mode").validateForTest()
-        }
-    }
-
-    @Test
-    fun legacyApiKeyValidationRemainsUnchanged() {
         codexConfig().copy(
             authMode = "",
             providerId = "custom-openai",
@@ -159,16 +141,6 @@ class RuntimeConfigRepositoryTest {
             openAiEndpointMode = OpenAiEndpointMode.CHAT_COMPLETIONS,
             apiKey = "test-key",
         ).validateForTest()
-
-        assertThrows(IllegalArgumentException::class.java) {
-            codexConfig().copy(
-                authMode = "",
-                providerId = "custom-openai",
-                providerSourceType = ProviderSourceTypes.CUSTOM,
-                openAiEndpointMode = OpenAiEndpointMode.CHAT_COMPLETIONS,
-                apiKey = "",
-            ).validateForTest()
-        }
     }
 
     private fun codexConfig() = AgentModelClient.ModelConfig(

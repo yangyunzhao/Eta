@@ -11,6 +11,8 @@
 
 Tasks 1–12 已形成并发布 `v2.6.0.znmlr.1`：认证标识与数据库迁移、设备码协议、AndroidKeyStore 加密凭据、登录与刷新生命周期、Runtime 安全传输、Codex Responses Provider、固定 OAuth 模型目录、设备码设置页、编译期开关和下游版本规则均已落地。真机已经完成登录、最小问答、一次本地只读工具回合、进程重启恢复、7 个模型拉取与切换调用；发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0` 并完成协议兼容修正。main 与 tag GitHub Actions 均通过。用户没有也不需要 API Key，该人工网络验收不适用，原路径以自动回归为准。AndroidKeyStore instrumentation 和注销后的敏感日志计数仍是已知验证缺口。
 
+2026-08-24 本地 `main` 已合入上游 `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`）。下游构建基线随上游版本重置为 `2.6.2.znmlr.1` / `26201`；本次仅完成本地合并与验证，尚未创建新的下游 tag、Release 或推送。
+
 本地自动门禁的实际结果是：兼容修复前隔离快照的完整 JVM 回归共 669 项，仍复现同一组 8 个 Windows/Robolectric/POSIX 基线失败，lint 为 0 error；当前候选的协议相关 7 类定向回归 81/81 和签名 Release 构建通过，没有新增 OAuth 失败。AndroidKeyStore instrumentation 已在真机发起，但设备两次拒绝 USB 安装测试 APK，因此 0 项测试实际执行，不能标记为通过。
 
 下游 CI/发布防护已经实现并通过代码审查：支持 `main`、`v*.znmlr.*` tag 和手动触发，构建前执行 unit test 与 lint，精确校验 tag、APK 和版本 metadata，并生成版本化资产名。它不会自动创建 tag、GitHub Release 或执行 push，且尚不能把上述本地门禁缺口记为通过；操作说明见 `.github/RELEASING.md`。

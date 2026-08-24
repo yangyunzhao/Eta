@@ -1,4 +1,6 @@
 package fuck.andes.ui.components
+import fuck.andes.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -69,6 +71,8 @@ import fuck.andes.agent.browser.AgentBrowserSession
 import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.ui.model.AgentChatMessageUi
 import fuck.andes.ui.model.AgentMessageUi
+import fuck.andes.ui.model.AgentContextUsageUi
+import fuck.andes.ui.model.AgentModelPickerUiState
 import fuck.andes.ui.model.MessageEditUiState
 import fuck.andes.ui.model.PendingFileReferenceUi
 import fuck.andes.ui.model.PendingImageUi
@@ -78,7 +82,9 @@ import fuck.andes.ui.model.ThinkingMessageUi
 import fuck.andes.ui.model.ToolActivityMessageUi
 import fuck.andes.ui.model.ToolSummaryMessageUi
 import fuck.andes.ui.model.UserMessageUi
+import fuck.andes.ui.model.latestContextUsage
 import fuck.andes.ui.app.AgentConversationRevisionReducer
+import fuck.andes.ui.app.LocalBlurEnabled
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -99,6 +105,8 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 /**
  * 聊天主体：消息流 + 底部输入框。
@@ -108,8 +116,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-fun AgentChatBody(
+internal fun AgentChatBody(
     messages: List<AgentChatMessageUi>,
+    modelPickerState: AgentModelPickerUiState,
     input: String,
     isStreaming: Boolean,
     reasoningEffort: ReasoningEffort,
@@ -118,6 +127,7 @@ fun AgentChatBody(
     pendingFileReferences: List<PendingFileReferenceUi>,
     messageEdit: MessageEditUiState?,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onModelSelected: (String) -> Unit,
     onSubmit: (String) -> Unit,
     onStop: () -> Unit,
     onAttachImage: (String) -> Unit,
@@ -142,6 +152,9 @@ fun AgentChatBody(
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val isKeyboardVisible = imeBottomPx > 0
     val browserSnapshot by AgentBrowserSession.snapshots.collectAsState()
+    val contextUsage = remember(messages, modelPickerState.selectedModel) {
+        latestContextUsage(messages, modelPickerState.selectedModel)
+    }
 
     val visibleMessages = remember(messages, messageEdit?.targetMessageId) {
         AgentConversationRevisionReducer.visibleMessagesForEdit(
@@ -191,6 +204,8 @@ fun AgentChatBody(
         hasMessages = visibleMessages.isNotEmpty(),
         scrollState = scrollState,
         input = input,
+        modelPickerState = modelPickerState,
+        contextUsage = contextUsage,
         isStreaming = isStreaming,
         reasoningEffort = reasoningEffort,
         availableReasoningEfforts = availableReasoningEfforts,
@@ -208,6 +223,7 @@ fun AgentChatBody(
             onSubmit(text)
         },
         onReasoningEffortChange = onReasoningEffortChange,
+        onModelSelected = onModelSelected,
         onStop = onStop,
         onAttachImage = onAttachImage,
         onRemoveImage = onRemoveImage,
@@ -234,6 +250,8 @@ private fun AgentChatScaffold(
     hasMessages: Boolean,
     scrollState: LazyListState,
     input: String,
+    modelPickerState: AgentModelPickerUiState,
+    contextUsage: AgentContextUsageUi,
     isStreaming: Boolean,
     reasoningEffort: ReasoningEffort,
     availableReasoningEfforts: List<ReasoningEffort>,
@@ -245,6 +263,7 @@ private fun AgentChatScaffold(
     onBottomAnchorChanged: (Boolean) -> Unit,
     onSubmit: (String) -> Unit,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onModelSelected: (String) -> Unit,
     onStop: () -> Unit,
     onAttachImage: (String) -> Unit,
     onRemoveImage: (String) -> Unit,
@@ -263,7 +282,7 @@ private fun AgentChatScaffold(
     modifier: Modifier = Modifier,
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
-    val frostEnabled = hasMessages && isRuntimeShaderSupported()
+    val frostEnabled = hasMessages && LocalBlurEnabled.current && isRuntimeShaderSupported()
     val messageBackdrop = rememberLayerBackdrop {
         // Backdrop 必须包含不透明底色，否则文字边缘模糊到透明区域时会出现黑边。
         drawRect(surfaceColor)
@@ -283,6 +302,9 @@ private fun AgentChatScaffold(
             AgentChatBottomBar(
                 messageBackdrop = messageBackdrop.takeIf { frostEnabled },
                 input = input,
+                modelPickerState = modelPickerState,
+                contextUsage = contextUsage,
+                showContextUsage = hasMessages,
                 isStreaming = isStreaming,
                 reasoningEffort = reasoningEffort,
                 availableReasoningEfforts = availableReasoningEfforts,
@@ -291,6 +313,7 @@ private fun AgentChatScaffold(
                 messageEdit = messageEdit,
                 onSubmit = onSubmit,
                 onReasoningEffortChange = onReasoningEffortChange,
+                onModelSelected = onModelSelected,
                 onStop = onStop,
                 onAttachImage = onAttachImage,
                 onRemoveImage = onRemoveImage,
@@ -528,11 +551,13 @@ internal fun AgentConversationMessages(
             verticalArrangement = Arrangement.Top,
             modifier = Modifier
                 .fillMaxSize()
-                .clipToBounds(),
+                .scrollEndHaptic()
+                .overScrollVertical(),
             contentPadding = PaddingValues(
                 top = 14.dp,
                 bottom = bottomInset + 14.dp,
             ),
+            overscrollEffect = null,
         ) {
             items(
                 items = timelineEntries,
@@ -624,7 +649,7 @@ internal fun AgentConversationMessages(
             ) {
                 Icon(
                     painter = painterResource(LucideR.drawable.lucide_ic_arrow_down),
-                    contentDescription = "回到底部",
+                    contentDescription = stringResource(R.string.ui_back_to_bottom_32282e),
                     modifier = Modifier.size(17.dp),
                     tint = MiuixTheme.colorScheme.onSurface,
                 )
@@ -752,6 +777,9 @@ internal fun resolveFinalResultMessageIds(
 private fun AgentChatBottomBar(
     messageBackdrop: LayerBackdrop?,
     input: String,
+    modelPickerState: AgentModelPickerUiState,
+    contextUsage: AgentContextUsageUi,
+    showContextUsage: Boolean,
     isStreaming: Boolean,
     reasoningEffort: ReasoningEffort,
     availableReasoningEfforts: List<ReasoningEffort>,
@@ -760,6 +788,7 @@ private fun AgentChatBottomBar(
     messageEdit: MessageEditUiState?,
     onSubmit: (String) -> Unit,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onModelSelected: (String) -> Unit,
     onStop: () -> Unit,
     onAttachImage: (String) -> Unit,
     onRemoveImage: (String) -> Unit,
@@ -829,6 +858,9 @@ private fun AgentChatBottomBar(
         ) {
             AgentChatInputBar(
                 input = input,
+                modelPickerState = modelPickerState,
+                contextUsage = contextUsage,
+                showContextUsage = showContextUsage,
                 isStreaming = isStreaming,
                 reasoningEffort = reasoningEffort,
                 availableReasoningEfforts = availableReasoningEfforts,
@@ -838,6 +870,7 @@ private fun AgentChatBottomBar(
                 editHasLaterTurns = messageEdit?.hasLaterTurns == true,
                 onSubmit = onSubmit,
                 onReasoningEffortChange = onReasoningEffortChange,
+                onModelSelected = onModelSelected,
                 onStop = onStop,
                 onAttachImage = onAttachImage,
                 onRemoveImage = onRemoveImage,
@@ -891,28 +924,28 @@ private fun EmptyChatState(
 ) {
     val suggestions = listOf(
         SuggestionItem(
-            title = "分析当前屏幕",
+            title = stringResource(R.string.ui_analyze_current_screen_ebf08f),
             iconRes = LucideR.drawable.lucide_ic_scan_text,
             iconTint = AccentBlue,
-            prompt = "截图并描述当前屏幕",
+            prompt = stringResource(R.string.suggestion_analyze_screen_prompt),
         ),
         SuggestionItem(
-            title = "打开微信",
+            title = stringResource(R.string.ui_open_wechat_6b2c28),
             iconRes = LucideR.drawable.lucide_ic_rocket,
             iconTint = AccentGreen,
-            prompt = "帮我打开微信",
+            prompt = stringResource(R.string.suggestion_open_wechat_prompt),
         ),
         SuggestionItem(
-            title = "浏览网页",
+            title = stringResource(R.string.ui_browse_the_web_da7afb),
             iconRes = LucideR.drawable.lucide_ic_globe,
             iconTint = AccentRed,
-            prompt = "打开 Agent 浏览器，搜索并总结今天的科技新闻要点",
+            prompt = stringResource(R.string.suggestion_browse_web_prompt),
         ),
         SuggestionItem(
-            title = "查看内存压力",
+            title = stringResource(R.string.ui_check_memory_pressure_2d9600),
             iconRes = LucideR.drawable.lucide_ic_square_terminal,
             iconTint = AccentYellow,
-            prompt = "读取 /proc/meminfo 和 /proc/pressure/，重点分析 PSI（Pressure Stall Information）指标，总结当前内存压力和系统状态",
+            prompt = stringResource(R.string.suggestion_memory_pressure_prompt),
         ),
     )
 
@@ -924,7 +957,7 @@ private fun EmptyChatState(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "有什么可以帮你？",
+                text = stringResource(R.string.ui_how_can_i_help_you_e75391),
                 style = MiuixTheme.textStyles.headline1,
                 color = MiuixTheme.colorScheme.onSurface,
             )

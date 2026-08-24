@@ -6,8 +6,8 @@ import fuck.andes.data.db.FuckAndesDatabase
 import fuck.andes.data.model.AnthropicProviderSetting
 import fuck.andes.data.model.CustomHeader
 import fuck.andes.data.model.OpenAiCompatibleProviderSetting
-import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ModelSource
+import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.data.provider.BuiltinProviders
@@ -57,11 +57,11 @@ class ProviderRepositoryTest {
             listOf(
                 ReasoningEffort.OFF,
                 ReasoningEffort.DEFAULT,
+                ReasoningEffort.MINIMAL,
                 ReasoningEffort.LOW,
                 ReasoningEffort.MEDIUM,
                 ReasoningEffort.HIGH,
                 ReasoningEffort.XHIGH,
-                ReasoningEffort.MAX,
             ),
             providers.getValue(BuiltinProviders.OPENAI_ID)
                 .models
@@ -135,20 +135,56 @@ class ProviderRepositoryTest {
     }
 
     @Test
+    fun switchingProvidersRestoresEachProvidersSelectedModel() = runBlocking {
+        ProviderRepository.ensureBuiltInsMerged()
+        val openAi = ProviderRepository.providerById(BuiltinProviders.OPENAI_ID)!!
+        val anthropic = ProviderRepository.providerById(BuiltinProviders.ANTHROPIC_ID)!!
+        val openAiModel = openAi.models[1]
+        val anthropicModel = anthropic.models[1]
+        SettingsDataStore.clearSelectedModelIdForProvider(openAi.id)
+        SettingsDataStore.clearSelectedModelIdForProvider(anthropic.id)
+
+        RuntimeConfigRepository.setSelectedProviderId(openAi.id)
+        RuntimeConfigRepository.setSelectedModelId(openAiModel.id)
+        RuntimeConfigRepository.setSelectedProviderId(anthropic.id)
+        RuntimeConfigRepository.setSelectedModelId(anthropicModel.id)
+
+        RuntimeConfigRepository.setSelectedProviderId(openAi.id)
+        assertEquals(openAiModel.id, SettingsDataStore.settings().selectedModelId)
+
+        RuntimeConfigRepository.setSelectedProviderId(anthropic.id)
+        assertEquals(anthropicModel.id, SettingsDataStore.settings().selectedModelId)
+    }
+
+    @Test
+    fun repairSelectionMigratesLegacyActiveModelToProviderMemory() = runBlocking {
+        ProviderRepository.ensureBuiltInsMerged()
+        val provider = ProviderRepository.providerById(BuiltinProviders.OPENAI_ID)!!
+        val model = provider.models[1]
+        SettingsDataStore.clearSelectedModelIdForProvider(provider.id)
+        SettingsDataStore.updateSettings {
+            it.copy(selectedProviderId = provider.id, selectedModelId = model.id)
+        }
+
+        ProviderRepository.repairSelection()
+
+        assertEquals(model.id, SettingsDataStore.selectedModelIdForProvider(provider.id))
+    }
+
+    @Test
     fun resettingBuiltInProviderPreservesItsSelectedAuthMode() = runBlocking {
         ProviderRepository.ensureBuiltInsMerged()
         val original = requireNotNull(ProviderRepository.providerById(BuiltinProviders.OPENAI_ID))
-        val provider = (original as OpenAiCompatibleProviderSetting)
-            .copy(
-                apiKey = "sk-existing",
-                authMode = ProviderAuthModes.CODEX_OAUTH,
-            )
+        val provider = (original as OpenAiCompatibleProviderSetting).copy(
+            apiKey = "sk-existing",
+            authMode = ProviderAuthModes.CODEX_OAUTH,
+        )
 
         try {
             ProviderRepository.updateProvider(provider)
             ProviderRepository.resetBuiltIn(provider.id)
 
-            val restored = ProviderRepository.providerById(provider.id)!!
+            val restored = requireNotNull(ProviderRepository.providerById(provider.id))
             assertEquals("sk-existing", restored.apiKey)
             assertEquals(ProviderAuthModes.CODEX_OAUTH, restored.authMode)
         } finally {
