@@ -10,11 +10,9 @@
 - [v2.6.0.znmlr.1 发布核对记录](RELEASE_V2.6.0_ZNMLR_1_CHECKLIST.md)
 - [v2.6.2.znmlr.1 发布核对记录](RELEASE_V2.6.2_ZNMLR_1_CHECKLIST.md)
 
-Tasks 1–12 已形成并发布 `v2.6.0.znmlr.1`：认证标识与数据库迁移、设备码协议、AndroidKeyStore 加密凭据、登录与刷新生命周期、Runtime 安全传输、Codex Responses Provider、固定 OAuth 模型目录、设备码设置页、编译期开关和下游版本规则均已落地。真机已经完成登录、最小问答、一次本地只读工具回合、进程重启恢复、7 个模型拉取与切换调用；发布前已核对官方 Codex CLI 最新稳定版 `rust-v0.147.0` 并完成协议兼容修正。main 与 tag GitHub Actions 均通过。用户没有也不需要 API Key，该人工网络验收不适用，原路径以自动回归为准。AndroidKeyStore instrumentation 和注销后的敏感日志计数仍是已知验证缺口。
+当前发布版本为 `v2.6.2.znmlr.1` / `26201`，基于上游 `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`）。Tasks 1–13 的实现与本次发布已完成：认证标识与数据库迁移、设备码协议、AndroidKeyStore 加密凭据、登录与刷新生命周期、Runtime 安全传输、Codex Responses Provider、固定 OAuth 模型目录、设备码设置页、编译期开关、v2.6.2 上游同步和下游版本规则均已落地。真机已经完成登录、最小问答、一次本地只读工具回合、进程重启恢复、7 个模型拉取与切换调用。最新官方 Codex CLI `rust-v0.149.1` 已与既有 `0.147.0` 契约逐项比较，无必须迁移的请求/认证变化，故兼容基线常量不机械升级。main 与 tag GitHub Actions 均通过。用户没有也不需要 API Key，该人工网络验收不适用，原路径以自动回归为准。`v2.6.0.znmlr.1` 保留为历史首发版本记录；AndroidKeyStore instrumentation、Windows 完整 JVM 和注销后的敏感日志计数仍是已知验证缺口，不得表述为已完成或已通过。
 
-2026-08-24 本地 `main` 已合入上游 `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`），并发布 `v2.6.2.znmlr.1` / `26201`。最新官方 Codex CLI `rust-v0.149.1` 已与既有 `0.147.0` 契约逐项比较，无必须迁移的请求/认证变化，故兼容基线常量不机械升级。
-
-本地自动门禁的实际结果分为两段：`v2.6.0.znmlr.1` 历史候选的兼容定向回归为 81/81；当前 `v2.6.2.znmlr.1` 合并候选的 Kotlin 编译、137 项 OAuth/Provider/迁移定向回归、Lint、Debug 与签名 Release 构建均通过。完整 JVM 回归共 714 项，仍复现同一组 8 个 Windows/Robolectric/POSIX 基线失败，没有新增 OAuth 失败。AndroidKeyStore instrumentation 已在真机发起，但设备两次拒绝 USB 安装测试 APK，因此 0 项测试实际执行，不能标记为通过。
+本地自动门禁的实际结果分为两段：`v2.6.0.znmlr.1` 历史候选的兼容定向回归为 81/81；当前已发布 `v2.6.2.znmlr.1` 的 Kotlin 编译、137 项 OAuth/Provider/迁移定向回归、Lint、Debug 与签名 Release 构建，以及 main/tag CI 均通过。完整 JVM 回归共 714 项，仍复现同一组 8 个 Windows/Robolectric/POSIX 基线失败，没有新增 OAuth 失败。AndroidKeyStore instrumentation 已在真机发起，但设备两次拒绝 USB 安装测试 APK，因此 0 项测试实际执行，不能标记为通过。
 
 下游 CI/发布防护已经实现并通过代码审查：支持 `main`、`v*.znmlr.*` tag 和手动触发，构建前执行 unit test 与 lint，精确校验 tag、APK 和版本 metadata，并生成版本化资产名。它不会自动创建 tag、GitHub Release 或执行 push，且尚不能把上述本地门禁缺口记为通过；操作说明见 `.github/RELEASING.md`。
 

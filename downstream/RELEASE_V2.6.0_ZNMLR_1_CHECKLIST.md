@@ -7,7 +7,7 @@
 | 项目 | 结果 |
 | --- | --- |
 | 下游版本 | `v2.6.0.znmlr.1` / `versionCode 26001` |
-| 功能代码基线 | `4247d79`（最终 tag 还将包含本发布记录提交） |
+| 功能代码基线 | `4247d79`；发布 tag `v2.6.0.znmlr.1` 最终指向 `16453f3c594c8f5d34d0bbba3aba0922ef190e39`，不移动历史 tag。 |
 | 上游 release | `v2.6.0` |
 | 上游 peeled commit | `4d02c2ca952830bc5a020612174f6035206879af` |
 | 上游基线关系 | `v2.6.0^{}` 是候选提交祖先 |
@@ -30,7 +30,7 @@
 | 门禁 | 状态 | 证据 |
 | --- | --- | --- |
 | Codex 模型目录定向回归 | 已完成 | `CodexModelsClientTest`、`RemoteModelFetcherTest`、`CodexResponsesProviderTest`、`ProviderClientFactoryTest` 与 Debug 构建在整合提交上通过。 |
-| 完整 JVM 回归 | 部分完成 | 兼容修复前的 Windows 隔离快照共 669 项，仍为既有 5 类 8 项 Windows/Robolectric/POSIX 基线失败；当前候选协议相关 7 类定向测试 81/81 通过，未把旧快照表述为候选 HEAD 的完整回归。 |
+| 完整 JVM 回归 | 部分完成 | 历史 v2.6.0 候选的 Windows 隔离快照共 669 项，仍为既有 5 类 8 项 Windows/Robolectric/POSIX 基线失败；协议相关 7 类定向测试 81/81 通过，未把旧快照表述为完整回归。 |
 | Android Lint | 已完成 | 0 error、100 warnings。 |
 | AndroidKeyStore instrumentation | 待完成 | 两次均在安装测试 APK 时被设备以 `INSTALL_FAILED_USER_RESTRICTED` 拒绝，0 项测试实际执行；不得记为通过。 |
 | GitHub Actions main/tag 构建 | 已完成 | main run `31821661448` 与 tag run `31822538400` 均通过完整单元测试、Lint、签名恢复、Debug/Release 构建、APK 验证和上传。 |

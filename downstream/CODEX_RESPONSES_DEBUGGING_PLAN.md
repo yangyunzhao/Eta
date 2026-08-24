@@ -1,4 +1,4 @@
-# Codex Responses Debug Logging and Protocol Repair Implementation Plan
+# Codex Responses Debug Logging and Protocol Repair Implementation Plan（v2.6.0 历史调试记录）
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -114,7 +114,7 @@ Task 2 进度 amend 到 Task 1 功能提交，不新增纯接线或进度提交�
 
 Run: `./gradlew :app:assembleDebug`
 
-Expected: BUILD SUCCESSFUL；APK versionName 为 `2.6.0.znmlr.1`，详细 logger 受 `BuildConfig.DEBUG` 门禁。
+Expected: BUILD SUCCESSFUL；历史 APK versionName 为 `2.6.0.znmlr.1`，详细 logger 受 `BuildConfig.DEBUG` 门禁。本节记录历史调试结果，不代表当前发布版本。
 
 - [x] **Step 2: 经用户已授权后覆盖安装**
 

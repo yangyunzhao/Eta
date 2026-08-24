@@ -6,11 +6,11 @@
 
 | 项目 | 结果 |
 | --- | --- |
-| 下游候选版本 | `v2.6.2.znmlr.1` / `versionCode 26201` |
-| 功能合并提交 | `266af06aeb9a76119b838506788d6d623963fc6e` |
+| 下游发布版本 | `v2.6.2.znmlr.1` / `versionCode 26201` |
+| 功能合并提交 / 发布 tag 提交 | `266af06aeb9a76119b838506788d6d623963fc6e` / `005c8a9b5c565cc4b3300846833647e35efb77ea` |
 | 上游 release | `v2.6.2` |
 | 上游 peeled commit | `bd4a14ceeda81b9063b9fde91b14e47f3851929f` |
-| 上游基线关系 | `v2.6.2^{}` 是候选提交祖先；未合入后续 `upstream/main` |
+| 上游基线关系 | `v2.6.2^{}` 是发布 tag 提交祖先；未合入后续 `upstream/main` |
 | 最新 Codex CLI 稳定版（核对时间：2026-08-24） | `rust-v0.149.1`，非 draft、非 prerelease |
 | Codex CLI tag object / peeled commit | `980a6d12110b110d29ec13bdcbe14011100b3566` / `ff29a44391deccde0aba0f8390337d7f3c319ea4` |
 | Eta 协议兼容基线 | `0.147.0`；不机械升级，已与 `0.149.1` 比对 |

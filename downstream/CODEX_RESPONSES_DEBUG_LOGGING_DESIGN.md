@@ -1,8 +1,8 @@
-# Codex Responses Debug 脱敏日志设计
+# Codex Responses Debug 脱敏日志设计（v2.6.0 历史调试记录）
 
 ## 目标
 
-为 `2.6.0.znmlr.1` Debug 构建补充足够详细的 Codex Responses 协议日志，用一次真实请求区分请求构造、HTTP、Content-Type、SSE 解析和服务端终态失败。Release 构建不得输出这些详细日志。
+本文件记录 `2.6.0.znmlr.1` 阶段的历史调试工作：为 Debug 构建补充足够详细的 Codex Responses 协议日志，用一次真实请求区分请求构造、HTTP、Content-Type、SSE 解析和服务端终态失败。Release 构建不得输出这些详细日志；它不是当前版本配置说明。
 
 ## 日志范围
 
