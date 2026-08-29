@@ -13,7 +13,7 @@
 
 当前发布版本为 `v2.6.2.znmlr.1` / `26201`，基于上游 `v2.6.2`（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`）。Tasks 1–13 的实现与本次发布已完成：认证标识与数据库迁移、设备码协议、AndroidKeyStore 加密凭据、登录与刷新生命周期、Runtime 安全传输、Codex Responses Provider、固定 OAuth 模型目录、设备码设置页、编译期开关、v2.6.2 上游同步和下游版本规则均已落地。真机已经完成登录、最小问答、一次本地只读工具回合、进程重启恢复、7 个模型拉取与切换调用。最新官方 Codex CLI `rust-v0.149.1` 已与既有 `0.147.0` 契约逐项比较，无必须迁移的请求/认证变化，故兼容基线常量不机械升级。main 与 tag GitHub Actions 均通过。用户没有也不需要 API Key，该人工网络验收不适用，原路径以自动回归为准。`v2.6.0.znmlr.1` 保留为历史首发版本记录；AndroidKeyStore instrumentation、Windows 完整 JVM 和注销后的敏感日志计数仍是已知验证缺口，不得表述为已完成或已通过。
 
-2026-08-29 本地 `main` 已进一步合入上游 `v2.6.5`（`bf0c6fee5968b1f1f31ec4dece1201082d17226c`），下一下游候选基线为 `2.6.5.znmlr.1` / `26501`，尚未创建下游 tag、GitHub Release 或推送。此次同步带来远程 MCP、运行中会话/工具轨迹恢复、跨协议流式块时间线、聊天 Markdown 排版和 Linux 按需工具档案；下游保留独立 Codex OAuth 路径、固定端点及既有凭据边界。
+2026-08-29 本地 `main` 已进一步合入上游 `v2.6.5`（`bf0c6fee5968b1f1f31ec4dece1201082d17226c`），并已发布 `v2.6.5.znmlr.1` / `26501`。此次同步带来远程 MCP、运行中会话/工具轨迹恢复、跨协议流式块时间线、聊天 Markdown 排版和 Linux 按需工具档案；下游保留独立 Codex OAuth 路径、固定端点及既有凭据边界。
 
 本地签名 Release 候选 APK 已构建并验证：applicationId `fuck.andes`，版本 `2.6.5.znmlr.1` / `26501`，SHA-256 `11B0FBBFAE6F6B70BB3DCD1BB65D9BA73B7F79825D2DC6E45EE9129645FD2545`。它仅供本地验证，当前不代表已发布版本。
 

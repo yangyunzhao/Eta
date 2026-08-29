@@ -13,7 +13,7 @@
 - OAuth access token、refresh token 和 ID token 不进入 Room Provider 表、RemotePreferences、Binder Bundle、日志或崩溃信息。
 - 现有 API Key Provider 必须保持兼容，数据库升级不能改变既有 Provider 的认证行为。
 
-> **实施状态（2026-08-29）：** `v2.6.0.znmlr.1`（`versionCode 26001`）与基于上游 `v2.6.2`（`bd4a14c`）的 `v2.6.2.znmlr.1`（`versionCode 26201`）均已发布。基于上游 `v2.6.5`（`bf0c6fe`）的本地候选为 `v2.6.5.znmlr.1`（`versionCode 26501`），已完成签名 Release 构建但尚未 tag/Release。本次同步将 Room schema 升至 v19，以兼容已发布下游 v16 与上游 v18 的数据库路径，并保留独立 Codex OAuth 边界。发布前已重新核对最新官方 Codex CLI `rust-v0.150.1`（peeled `90854393966b21e9ebfd21b122334eb09a20c93d`）：设备码、refresh、models、Responses 和 SSE 契约相对 0.149.1 无变化，故 `CODEX_PROTOCOL_COMPAT_VERSION` 继续表示完整验证过的 `0.147.0` 基线，不机械升级。AndroidKeyStore instrumentation 和注销后的敏感日志计数尚未完成，作为已知验证缺口保留。
+> **实施状态（2026-08-29）：** `v2.6.0.znmlr.1`（`versionCode 26001`）、基于上游 `v2.6.2`（`bd4a14c`）的 `v2.6.2.znmlr.1`（`versionCode 26201`）以及基于上游 `v2.6.5`（`bf0c6fe`）的 `v2.6.5.znmlr.1`（`versionCode 26501`）均已发布。本次同步将 Room schema 升至 v19，以兼容已发布下游 v16 与上游 v18 的数据库路径，并保留独立 Codex OAuth 边界。发布前已重新核对最新官方 Codex CLI `rust-v0.150.1`（peeled `90854393966b21e9ebfd21b122334eb09a20c93d`）：设备码、refresh、models、Responses 和 SSE 契约相对 0.149.1 无变化，故 `CODEX_PROTOCOL_COMPAT_VERSION` 继续表示完整验证过的 `0.147.0` 基线，不机械升级。AndroidKeyStore instrumentation 和注销后的敏感日志计数尚未完成，作为已知验证缺口保留。
 
 下游 CI/发布防护已经实现并通过代码审查：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，精确校验 tag、APK 和版本 metadata，并使用版本化资产名。该流程不会自动创建 tag、GitHub Release 或执行 push，也不会把未通过的门禁或 Task 9 人工验收视为成功。
 
