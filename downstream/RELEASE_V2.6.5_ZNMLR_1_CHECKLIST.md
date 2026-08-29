@@ -1,16 +1,16 @@
-# v2.6.5.znmlr.1 候选核对记录
+# v2.6.5.znmlr.1 发布核对记录
 
-> 本文件记录本地候选验证，不代表已发布。不得写入设备码、OAuth token、Account ID、签名密码、KeyStore 内容或服务端原始响应。
+> 本文件记录脱敏发布证据。不得写入设备码、OAuth token、Account ID、签名密码、KeyStore 内容或服务端原始响应。
 
 ## 版本与来源
 
 | 项目 | 结果 |
 | --- | --- |
-| 下游候选版本 | `v2.6.5.znmlr.1` / `versionCode 26501` |
-| 本地 merge 提交 | `9fe46cd07290db6fca0fba553e2cf0def77d2e66` |
+| 下游发布版本 | `v2.6.5.znmlr.1` / `versionCode 26501` |
+| 本地 merge / 发布 tag 提交 | `9fe46cd07290db6fca0fba553e2cf0def77d2e66` / `13296d2dc0bd7f3524f8d660b272a427064d53b3` |
 | 上游 release | `v2.6.5` |
 | 上游 peeled commit | `bf0c6fee5968b1f1f31ec4dece1201082d17226c` |
-| 上游基线关系 | `v2.6.5^{}` 是本地候选提交祖先；未合入后续 `upstream/main` |
+| 上游基线关系 | `v2.6.5^{}` 是发布 tag 提交祖先；未合入后续 `upstream/main` |
 | 当前正式发布 | `v2.6.2.znmlr.1` / `26201` |
 | 最新 Codex CLI 稳定版（核对时间：2026-08-29） | `rust-v0.150.1`，非 draft、非 prerelease |
 | Codex CLI tag object / peeled commit | `0eb410ad0dd161ea323b05452f978de01cd63430` / `90854393966b21e9ebfd21b122334eb09a20c93d` |
@@ -26,21 +26,30 @@
 | Android Lint | 已完成 | `:app:lintDebug` 成功。 |
 | Debug APK | 已完成 | `:app:assembleDebug` 成功，`2.6.5.znmlr.1` / `26501`。 |
 | 本地签名 Release APK | 已完成 | applicationId、版本与证书已核验。 |
-| GitHub Actions main/tag | 待完成 | 尚未推送本地候选。 |
+| GitHub Actions main/tag | 已完成 | main run `33240221449` 与 tag run `33240810040` 均通过完整单元测试、Lint、签名恢复、Debug/Release 构建、APK 校验和上传。 |
 
 ## 本地签名 Release APK
 
 | 项目 | 结果 |
 | --- | --- |
-| 文件 | `release/Eta-v2.6.5.znmlr.1-release.apk` |
+| 本地候选文件 | `release/Eta-v2.6.5.znmlr.1-release.apk` |
 | applicationId | `fuck.andes` |
 | 版本 | `2.6.5.znmlr.1` / `26501` |
 | 大小 | `6,088,872` 字节 |
 | SHA-256 | `11B0FBBFAE6F6B70BB3DCD1BB65D9BA73B7F79825D2DC6E45EE9129645FD2545` |
 | 签名 | APK Signature Scheme v2，证书 SHA-256 `44:4D:EB:65:E1:19:AE:74:38:6D:76:D2:16:FC:EE:70:62:B8:A9:0C:68:AF:28:DE:29:53:BE:24:D7:1D:C7:91` |
 
+## 最终 CI Release 与发布
+
+| 项目 | 结果 |
+| --- | --- |
+| tag | `v2.6.5.znmlr.1` → `13296d2dc0bd7f3524f8d660b272a427064d53b3` |
+| CI Release APK 大小 | `6,086,736` 字节 |
+| CI Release APK SHA-256 | `F3EF8D6D3885AD92A12A0EF98D0A6562F8554473EE8CB6B74141AAEFD947D200` |
+| GitHub Release | `https://github.com/yangyunzhao/Eta/releases/tag/v2.6.5.znmlr.1` |
+
 ## 已知验证缺口
 
 - 用户已手动安装本地候选并报告使用正常；不以此替代自动验证。
 - AndroidKeyStore instrumentation 与注销后的敏感 logcat 匹配计数仍未完成，不能追记为通过。
-- 当前仅为本地候选；在 main/tag CI、CI Release APK 核验和远端回执完成前，不推送 `v2.6.5.znmlr.1` tag，也不创建 GitHub Release。
+- GitHub Actions main/tag、CI Release APK 签名/版本/哈希核验和远端回执均已完成，`v2.6.5.znmlr.1` 已正式发布。AndroidKeyStore instrumentation 与注销敏感日志计数仍为已知验证缺口，不得追记为通过。
