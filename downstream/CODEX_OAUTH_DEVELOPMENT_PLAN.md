@@ -92,6 +92,7 @@
 | Task 14 / Step 1 | 已完成 | 本地以普通 merge 合入上游轻量 tag `v2.6.5`（`bf0c6fee5968b1f1f31ec4dece1201082d17226c`），未合入后续 `upstream/main`。 |
 | Task 14 / Step 2 | 已完成 | Room 升至 v19，兼容已发布下游 v16 与上游 v18；上游 Responses 流式块/MCP 生命周期改造已迁入共享解析器并保留独立 Codex OAuth Provider。 |
 | Task 14 / Step 3 | 已完成 | Kotlin 编译、MCP/恢复链/OAuth 定向回归、Lint 与 Debug APK 构建通过；完整 JVM 764 项仍仅 8 个既有 Windows/Robolectric/POSIX 基线失败。 |
+| Task 14 / Step 4 | 已完成 | 本地签名 Release 候选构建成功，`apkanalyzer` 与 `apksigner` 确认 `2.6.5.znmlr.1` / `26501`、applicationId `fuck.andes` 和既有发布证书；未推送/tag/Release。 |
 
 > 注：完整 JVM 基线目前有 8 个非 OAuth 失败；6 个为 Windows/Robolectric 与 Android/POSIX 环境差异，另 2 个分别是 Windows 下 `Uri` 对盘符路径的解析差异，以及 `AtomicFile` 依赖的覆盖重命名在 Windows 下失败。这些失败不计为 Codex OAuth 新功能通过，也不得用于跳过 Task 8 的整合门禁。
 
@@ -594,6 +595,10 @@ Room 升至 v19，支持下游 v16 与上游 v18 的历史数据库；共享 Res
 - [x] **Step 3: 完成本地候选自动验证**
 
 Kotlin 编译、MCP/恢复链/OAuth 定向回归、Lint 与 Debug APK 构建通过；完整 JVM 764 项仍仅有 8 个既有 Windows/Robolectric/POSIX 基线失败。`2.6.5.znmlr.1` 尚未创建 tag 或 Release。
+
+- [x] **Step 4: 构建并核验本地签名 Release 候选**
+
+构建 `:app:assembleRelease`，确认 applicationId `fuck.andes`、版本 `2.6.5.znmlr.1` / `26501`、APK Signature Scheme v2 与 znmlr 发布证书。候选未推送、未创建 tag 或 GitHub Release。
 
 ---
 

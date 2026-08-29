@@ -11,11 +11,13 @@
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| Codex OAuth 设备码登录 | 已发布 `v2.6.2.znmlr.1` | 认证、加密凭据、刷新、安全 IPC、Codex Responses、固定模型目录、设备码设置页、编译期开关和下游版本规则已经整合；真机登录、问答、只读工具、重启恢复及 7 个模型拉取已验证 |
+| Codex OAuth 设备码登录 | 已发布 `v2.6.2.znmlr.1`；本地候选 `v2.6.5.znmlr.1` | 认证、加密凭据、刷新、安全 IPC、Codex Responses、固定模型目录、设备码设置页、编译期开关和下游版本规则已经整合；v2.6.5 同步新增 MCP、运行恢复与跨协议流式块支持，仍待 tag/Release |
 
 使用流程是：在内置 OpenAI Provider 选择 `CODEX_OAUTH`，由 Eta 展示设备码并打开固定 OpenAI 验证页，用户授权后应用通过轮询完成登录。整个流程不使用浏览器回调、Deep Link、WebView 或本地 HTTP 回调服务器。当前已验证的可靠路径是让 Eta 保持前台，并在电脑或另一台设备打开 `https://auth.openai.com/codex/device` 输入验证码；部分手机在切到同机浏览器后会回收 Eta 进程，导致本轮内存登录会话丢失。使用者无需再填写 OpenAI Platform API Key，但请求会消耗登录账号的 Codex 共享额度；共享额度不是无限免费，具体可用量受账号与服务策略约束。
 
 当前发布版本为 [`v2.6.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v2.6.2.znmlr.1)（`versionCode 26201`），基于上游 [`v2.6.2`](https://github.com/Mangi-11/Eta/releases/tag/v2.6.2)（`bd4a14ceeda81b9063b9fde91b14e47f3851929f`）。本地 `main` 已进一步合入上游 `v2.6.5`（`bf0c6fee5968b1f1f31ec4dece1201082d17226c`），下一下游候选基线为 `2.6.5.znmlr.1` / `26501`，尚未创建 tag 或 GitHub Release。2026-08-24 已按官方 Codex CLI `rust-v0.149.1`（peeled `ff29a44391deccde0aba0f8390337d7f3c319ea4）核对设备码、刷新、Responses 与模型目录契约：无必须迁移的变化，因此 `CODEX_PROTOCOL_COMPAT_VERSION` 保持代表已完整验证的 `0.147.0` 基线。v2.6.2 的 main 与 tag CI 均已通过，最终 CI Release APK 的 SHA-256 为 `2BB9C10E8A3A484511433814FCB7B5C5BFE344E93D951022455E292EE6B314E1`。用户没有也不需要 API Key，因此该人工网络验收不适用，原路径只采用自动回归且不发起 Platform API 请求。AndroidKeyStore instrumentation 因手机拒绝 USB 安装测试 APK而尚未实际执行，注销后的敏感日志计数也尚未完成，均作为本版本的已知验证缺口保留。
+
+本地候选 `v2.6.5.znmlr.1` 已通过 Kotlin 编译、MCP/恢复链/OAuth 定向回归、Lint、Debug 和签名 Release 构建；本地签名 APK 为 `release/Eta-v2.6.5.znmlr.1-release.apk`，SHA-256 为 `11B0FBBFAE6F6B70BB3DCD1BB65D9BA73B7F79825D2DC6E45EE9129645FD2545`。它尚未推送、创建 tag 或 GitHub Release，详细证据见下方候选核对记录。
 
 仓库已经加入下游 CI/发布防护：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，并精确核对 tag、APK 和版本 metadata，发布资产使用版本化名称。该流程不会自动创建 tag、GitHub Release 或执行 push；`v2.6.2.znmlr.1` 的 main 与 tag 工作流均已通过。详细发布步骤见 `.github/RELEASING.md`。
 
@@ -26,6 +28,7 @@
 - [Codex OAuth 开发计划](downstream/CODEX_OAUTH_DEVELOPMENT_PLAN.md)
 - [v2.6.0.znmlr.1 发布核对记录](downstream/RELEASE_V2.6.0_ZNMLR_1_CHECKLIST.md)
 - [v2.6.2.znmlr.1 发布核对记录](downstream/RELEASE_V2.6.2_ZNMLR_1_CHECKLIST.md)
+- [v2.6.5.znmlr.1 候选核对记录](downstream/RELEASE_V2.6.5_ZNMLR_1_CHECKLIST.md)
 
 ## 与上游的关系
 
