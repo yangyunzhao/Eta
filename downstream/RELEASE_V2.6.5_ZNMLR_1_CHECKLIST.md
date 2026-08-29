@@ -12,6 +12,9 @@
 | 上游 peeled commit | `bf0c6fee5968b1f1f31ec4dece1201082d17226c` |
 | 上游基线关系 | `v2.6.5^{}` 是本地候选提交祖先；未合入后续 `upstream/main` |
 | 当前正式发布 | `v2.6.2.znmlr.1` / `26201` |
+| 最新 Codex CLI 稳定版（核对时间：2026-08-29） | `rust-v0.150.1`，非 draft、非 prerelease |
+| Codex CLI tag object / peeled commit | `0eb410ad0dd161ea323b05452f978de01cd63430` / `90854393966b21e9ebfd21b122334eb09a20c93d` |
+| Eta 协议兼容基线 | `0.147.0`；相对 0.149.1→0.150.1 的设备码、refresh、models、Responses 与 SSE 契约无变化，不机械升级。 |
 
 ## 本地自动验证
 
@@ -38,5 +41,6 @@
 
 ## 已知验证缺口
 
+- 用户已手动安装本地候选并报告使用正常；不以此替代自动验证。
 - AndroidKeyStore instrumentation 与注销后的敏感 logcat 匹配计数仍未完成，不能追记为通过。
 - 当前仅为本地候选；在 main/tag CI、CI Release APK 核验和远端回执完成前，不推送 `v2.6.5.znmlr.1` tag，也不创建 GitHub Release。
