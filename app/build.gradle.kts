@@ -31,8 +31,8 @@ val codexOAuthEnabled = rawCodexOAuthBuildProperty
     }
     .orElse(true)
 
-val upstreamVersionName = "2.6.2"
-val upstreamVersionCode = 262
+val upstreamVersionName = "2.6.5"
+val upstreamVersionCode = 265
 val downstreamReleaseSequence = 1
 val downstreamVersionLabel = "znmlr"
 val downstreamVersionCodeMultiplier = 100
@@ -188,6 +188,7 @@ dependencies {
     implementation(libs.lucide.icons)
     implementation(libs.androidx.navigationevent)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.activity.compose)
     implementation(libs.markdown.renderer)
     implementation(libs.markdown.renderer.m3)

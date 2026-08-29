@@ -9,6 +9,9 @@ import fuck.andes.agent.model.AgentHttpClient
 import fuck.andes.agent.model.ProviderClientFactory
 import fuck.andes.agent.memory.AgentMemoryContext
 import fuck.andes.agent.memory.AgentMemoryContextBuilder
+import fuck.andes.agent.mcp.McpRunSnapshot
+import fuck.andes.agent.mcp.McpToolExecutor
+import fuck.andes.agent.mcp.RoutingToolExecutor
 import fuck.andes.agent.overlay.AgentOverlayVisibilityPolicy
 import fuck.andes.agent.skill.SkillCompatibilityChecker
 import fuck.andes.agent.skill.SkillContext
@@ -17,11 +20,13 @@ import fuck.andes.agent.skill.PublicGitHubSkillSource
 import fuck.andes.agent.tool.AgentLocalTools
 import fuck.andes.agent.tool.PendingSkillConflictCapabilityParser
 import fuck.andes.agent.tool.ToolExecutionDecision
+import fuck.andes.agent.voice.EtaAssistantOverlayService
 import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.core.safeLogType
 import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import fuck.andes.data.repository.AgentMemoryRepository
 import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
 
 /**
  * 单次 Runtime run 的阻塞执行器。
@@ -57,14 +62,22 @@ internal class AgentRuntimeRunExecutor(
         val runController = session.controller
         val archivedEvents = mutableListOf<AgentEvent>()
         var entrySurfaceGuard: EntrySurfaceGuard? = null
-        var toolExecutor: AgentLocalTools? = null
+        var toolExecutor: AutoCloseable? = null
         var toolsBinding: AgentRunController.ResourceBinding? = null
         var response: AgentModelClient.ModelResponse.Text? = null
         var cancelled = false
+        var checkpointRecorder: AgentRunCheckpointRecorder? = null
         val timing = AgentRunTiming(AndroidAgentLogger)
 
         val result = try {
-            entrySurfaceGuard = EntrySurfaceGuard.from(request.handoff, AndroidAgentLogger)
+            checkpointRecorder = AgentRunCheckpointRecorder.create(appContext, request)
+            entrySurfaceGuard = EntrySurfaceGuard.from(
+                handoff = request.handoff,
+                logger = AndroidAgentLogger,
+                etaVoiceSurfaceDismissal = {
+                    EtaAssistantOverlayService.dismissForForegroundOperation(appContext)
+                },
+            )
             val skillIndexService = SkillRuntime.createIndexService(appContext)
             val skillLoader = SkillRuntime.createLoader(appContext)
             val skillResourceReader = SkillRuntime.createResourceReader(appContext)
@@ -94,6 +107,15 @@ internal class AgentRuntimeRunExecutor(
                 AgentMemoryContext.DISABLED
             }
             val pendingSkillConflict = PendingSkillConflictCapabilityParser.parse(request.history)
+            val mcpSnapshot = runBlocking {
+                runCatching { McpRunSnapshot.load() }.getOrElse { throwable ->
+                    AndroidAgentLogger.warnThrottled("agent_mcp_snapshot_failed") {
+                        "MCP tool snapshot unavailable: type=${throwable.safeLogType()}"
+                    }
+                    McpRunSnapshot.EMPTY
+                }
+            }
+            val mcpTools = JSONArray().also(mcpSnapshot::appendModelTools)
             val executor = AgentLocalTools(
                 context = appContext,
                 logger = AndroidAgentLogger,
@@ -144,7 +166,7 @@ internal class AgentRuntimeRunExecutor(
                             entrySurfaceGuard?.dismissOnce() == false ->
                                 ToolExecutionDecision.Reject(
                                     code = "ENTRY_SURFACE_NOT_READY",
-                                    message = "入口窗口尚未确认关闭；本次工具未执行，请稍后重试",
+                                    message = "入口窗口关闭未完成；本次工具未执行，请勿在当前任务中重复调用",
                                 )
                             else -> ToolExecutionDecision.Allow
                         }
@@ -158,8 +180,12 @@ internal class AgentRuntimeRunExecutor(
                 runAvailableSkillIds = skillContext.installedSkills.mapTo(mutableSetOf()) { it.id },
                 pendingSkillConflict = pendingSkillConflict,
             )
-            toolExecutor = executor
-            toolsBinding = runController.register(executor::close)
+            val routingExecutor = RoutingToolExecutor(
+                local = executor,
+                mcp = McpToolExecutor(mcpSnapshot),
+            )
+            toolExecutor = routingExecutor
+            toolsBinding = runController.register(routingExecutor::close)
             timing.preparationFinished(skillContext.installedSkills.size)
             val modelProvider = ProviderClientFactory.getClient(
                 config = request.config,
@@ -174,16 +200,23 @@ internal class AgentRuntimeRunExecutor(
             val completedResponse = AgentModelClient.complete(
                 config = request.config,
                 prompt = request.prompt,
-                toolExecutor = executor,
+                toolExecutor = routingExecutor,
                 images = request.images,
                 history = request.history,
                 provider = modelProvider,
                 runController = runController,
                 skillContext = skillContext,
                 memoryContext = memoryContext,
+                additionalTools = mcpTools,
             ) { event ->
                 timing.accept(event)
-                acceptEvent(session, event, archivedEvents, entrySurfaceGuard)
+                acceptEvent(
+                    session,
+                    event,
+                    archivedEvents,
+                    entrySurfaceGuard,
+                    checkpointRecorder,
+                )
             }
             response = completedResponse
             AgentRuntimeWire.RunResult(
@@ -208,7 +241,21 @@ internal class AgentRuntimeRunExecutor(
                     "Agent runtime failed: type=${throwable.safeLogType()}"
                 )
                 val event = AgentEvent.RunFailed(message)
-                acceptEvent(session, event, archivedEvents, entrySurfaceGuard)
+                runCatching {
+                    acceptEvent(
+                        session,
+                        event,
+                        archivedEvents,
+                        entrySurfaceGuard,
+                        checkpointRecorder,
+                    )
+                }.onFailure { checkpointFailure ->
+                    AndroidAgentLogger.error(
+                        "Agent runtime failure checkpoint failed: " +
+                            "type=${checkpointFailure.safeLogType()}"
+                    )
+                    session.emit(event)
+                }
             }
             AgentRuntimeWire.RunResult(
                 runId = request.runId,
@@ -224,6 +271,12 @@ internal class AgentRuntimeRunExecutor(
         }
 
         if (cancelled) {
+            runCatching { checkpointRecorder?.discard() }.onFailure { throwable ->
+                AndroidAgentLogger.error(
+                    "Agent runtime cancelled checkpoint cleanup failed: " +
+                        "type=${throwable.safeLogType()}"
+                )
+            }
             session.cancel("已停止")
             return Outcome(
                 result = result,
@@ -240,6 +293,12 @@ internal class AgentRuntimeRunExecutor(
                 request
             }
         val committed = session.complete(result) {
+            runCatching { checkpointRecorder?.seal() }
+                .onFailure { throwable ->
+                    AndroidAgentLogger.error(
+                        "Agent runtime checkpoint seal failed: type=${throwable.safeLogType()}"
+                    )
+                }
             runCatching { persistArtifacts(completedRequest, result, archivedEvents) }
                 .onFailure { throwable ->
                     AndroidAgentLogger.error(
@@ -261,7 +320,9 @@ internal class AgentRuntimeRunExecutor(
         event: AgentEvent,
         archivedEvents: MutableList<AgentEvent>,
         entrySurfaceGuard: EntrySurfaceGuard?,
+        checkpointRecorder: AgentRunCheckpointRecorder?,
     ) {
+        checkpointRecorder?.accept(event)
         if (!session.emit(event)) return
         archivedEvents += event
         if (event !is AgentEvent.AssistantBlockDelta) {

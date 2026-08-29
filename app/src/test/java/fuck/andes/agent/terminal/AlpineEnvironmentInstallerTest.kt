@@ -50,20 +50,65 @@ class AlpineEnvironmentInstallerTest {
         assertFalse(AlpineEnvironmentPaths.commonToolsReady(rootfs.absolutePath))
 
         File(rootfs, AlpineEnvironmentPaths.COMMON_TOOLS_MARKER).writeText(
-            "alpine=3.24.1\ntoolset=${AlpineEnvironmentPaths.TOOLSET_REVISION}\nprofiles=agent,python\n",
+            "alpine=3.24.1\ntoolset=${AlpineEnvironmentPaths.TOOLSET_REVISION}\nprofiles=agent\n",
         )
         assertTrue(AlpineEnvironmentPaths.commonToolsReady(rootfs.absolutePath))
     }
 
     @Test
-    fun defaultToolsetContainsAgentAndPythonEssentialsWithoutInteractiveEditors() {
-        val packages = AlpineEnvironmentInstaller.DEFAULT_PACKAGES
+    fun baseToolsetContainsAgentEssentialsWithoutPythonOrInteractiveEditors() {
+        val packages = AlpineEnvironmentInstaller.AGENT_PACKAGES
 
         assertTrue(packages.containsAll(listOf("ripgrep", "fd", "diffutils", "patch", "rsync")))
-        assertTrue(packages.containsAll(listOf("python3", "py3-virtualenv", "pipx", "uv", "ruff")))
+        assertFalse(packages.contains("python3"))
+        assertFalse(packages.contains("uv"))
         assertFalse(packages.contains("vim"))
         assertFalse(packages.contains("nano"))
         assertEquals(packages.distinct(), packages)
+    }
+
+    @Test
+    fun packageProfilesCoverPythonNodeAndSshToolchains() {
+        assertTrue(
+            AlpinePackageProfiles.PYTHON.packages
+                .containsAll(listOf("python3", "py3-virtualenv", "pipx", "uv", "ruff")),
+        )
+        assertTrue(AlpinePackageProfiles.NODE.packages.containsAll(listOf("nodejs", "npm")))
+        assertTrue(AlpinePackageProfiles.SSH.packages.contains("openssh"))
+        AlpinePackageProfiles.ALL.forEach { profile ->
+            assertEquals(profile.packages.distinct(), profile.packages)
+            assertTrue(profile.markerName.startsWith(".eta-"))
+            assertTrue(profile.verifyCommands.isNotEmpty())
+        }
+        assertEquals(AlpinePackageProfiles.ALL.map { it.id }.distinct(), AlpinePackageProfiles.ALL.map { it.id })
+    }
+
+    @Test
+    fun packageProfileReadinessHonoursMarkerRevisionAndLegacyBinaryInstalls() {
+        val rootfs = temporaryFolder.newFolder("python-rootfs")
+        File(rootfs, "bin").mkdirs()
+        File(rootfs, "bin/busybox").writeText("busybox")
+        File(rootfs, AlpineEnvironmentPaths.READY_MARKER).writeText("version=3.24.1\n")
+        File(rootfs, AlpineEnvironmentPaths.COMMON_TOOLS_MARKER).writeText(
+            "toolset=${AlpineEnvironmentPaths.TOOLSET_REVISION}\n",
+        )
+        val python = AlpinePackageProfiles.PYTHON
+
+        assertFalse(AlpineEnvironmentPaths.packageProfileReady(rootfs.absolutePath, python))
+
+        File(rootfs, python.markerName).writeText("profile=0\n")
+        assertFalse(AlpineEnvironmentPaths.packageProfileReady(rootfs.absolutePath, python))
+
+        File(rootfs, python.markerName).writeText("profile=${python.revision}\n")
+        assertTrue(AlpineEnvironmentPaths.packageProfileReady(rootfs.absolutePath, python))
+
+        // toolset 2 及更早的环境把 Python 装进基础工具集且无独立 marker，靠二进制存在性识别。
+        File(rootfs, python.markerName).delete()
+        File(rootfs, "usr/bin").mkdirs()
+        File(rootfs, "usr/bin/python3").writeText("python3")
+        assertFalse(AlpineEnvironmentPaths.packageProfileReady(rootfs.absolutePath, python))
+        File(rootfs, "usr/bin/uv").writeText("uv")
+        assertTrue(AlpineEnvironmentPaths.packageProfileReady(rootfs.absolutePath, python))
     }
 
     @Test

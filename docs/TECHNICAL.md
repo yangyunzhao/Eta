@@ -37,7 +37,7 @@ Release 裁剪以 `app/proguard-rules.pro` 为唯一可执行事实来源，规�
 
 Manifest 注册 `VoiceInteractionService`、独立进程的 `VoiceInteractionSessionService`、全屏 `TYPE_APPLICATION_OVERLAY` 助理浮窗以及 Android 助理角色资格要求的 `RecognitionService`。设置页只负责打开系统数字助理选择界面；当前浮窗不请求麦克风权限。
 
-`VoiceInteractionSession` 只承接系统入口并关闭自身 UI；`EtaAssistantOverlayService` 持有全屏窗口、彩色边缘动画和键盘输入。窗口通过 `setFitInsetsTypes(0)` 绘制到状态栏、导航栏与显示开孔后方，可交互内容再通过 `WindowInsetsRulers.SafeDrawing` 与 `Ime` 保持可触达，避免给根容器增加 Insets 后截断 edge-to-edge 背景。用户提交的文本交给 `AgentRuntimeClient`；请求、流式结果、前台工具收起、取消与归档沿用既有 Runtime 协议，当前不执行语音识别或语音朗读。
+`VoiceInteractionSession` 只承接系统入口并关闭自身 UI；`EtaAssistantOverlayService` 持有全屏窗口、彩色边缘动画和键盘输入。窗口通过 `setFitInsetsTypes(0)` 绘制到状态栏、导航栏与显示开孔后方，可交互内容再通过 `WindowInsetsRulers.SafeDrawing` 与 `Ime` 保持可触达，避免给根容器增加 Insets 后截断 edge-to-edge 背景。用户提交的文本交给 `AgentRuntimeClient`；请求、流式结果、前台工具收起、取消与归档沿用既有 Runtime 协议。前台工具执行前，Eta 自有入口在主线程定向移除窗口并通知系统会话 `hide()`，Runtime 等待该 View 真正 detach 后才继续；小布与超级小爱等外部入口仍使用返回动作和目标包窗口确认。当前不执行语音识别或语音朗读。
 
 `:voice`、`:voice_session` 与 `:recognition` 进程只初始化本地偏好，不预热数据库、Skills 或 Xposed UI 服务。`RecognitionService` 仅保留 Android 数字助理角色资格所需声明，不由当前浮窗调用；HyperOS 按键适配不在当前实现范围内。
 
@@ -168,7 +168,7 @@ Eta 不对浏览器请求执行额外的 URL、DNS、IP、主机数量、请求�
 终端按用途分为两个环境：
 
 - `android` 是原生 Android Shell，负责系统、应用、日志、Magisk 和设备文件操作。Root 会话会自动发现 Magisk、KernelSU 或 APatch 提供的 BusyBox，并以 standalone `ash` 补齐不在系统 PATH 中的 applet。
-- `linux` 是可选安装的 Alpine 工具环境，预装模型高频使用的 `rg`、`fd`、Git/SSH、diff/patch、curl、rsync、jq、SQLite、常用压缩工具与 Python 工具链。Eta 下载固定版本的官方 minirootfs 并校验 SHA-256，在 App 私有目录中解压，通过独立 mount namespace + Root chroot 运行；Linux 默认在映射到 Eta Android 工作目录的 `/workspace` 中执行，共享存储位于 `/sdcard`。它不是安全沙箱，也不会取代 Android 环境。
+- `linux` 是可选安装的 Alpine 工具环境，预装模型高频使用的 `rg`、`fd`、Git/SSH、diff/patch、curl、rsync、jq、SQLite 与常用压缩工具；Python 工具链（python3、pip、venv、pipx、uv、Ruff）、Node.js 环境（nodejs、npm）、完整 OpenSSH（sshd、ssh-keygen 等）与 APK 分析工具（OpenJDK、JADX、Apktool、smali、baksmali）作为独立 profile 按需安装。Eta 下载固定版本的官方 minirootfs 并校验 SHA-256，在 App 私有目录中解压，通过独立 mount namespace + Root chroot 运行；Linux 默认在映射到 Eta Android 工作目录的 `/workspace` 中执行，共享存储位于 `/sdcard`。它不是安全沙箱，也不会取代 Android 环境。
 
 聊天输入栏可以引用内部存储与 `/data/local/tmp` 下的文件或文件夹，发送后以附件名称和原始请求分开展示。Eta 只把经过 Root 校验的规范绝对路径写入模型上下文，不上传、不复制或缓存原文件；模型再按任务调用文件或终端工具读取。系统文件选择器会解析内部存储文档，以及能转换为本地媒体库路径的“最近”文件；云盘和其他只有 `content://` URI 的来源不会降级为上传。
 
@@ -190,6 +190,8 @@ Eta 不对浏览器请求执行额外的 URL、DNS、IP、主机数量、请求�
 ## 聊天流式渲染
 
 模型的 SSE 文本增量先在 App 状态层按 50 ms 合并，减少高频列表状态写入；思考、工具调用和块边界事件仍会立即刷新，事件顺序不变。聊天渲染使用增量 Markdown AST，但不会把尚未显示的大段网络 backlog 一次性交给布局：解析器每次最多追加 12 个 Unicode 字素，批与批之间让出一拍供重组排版，供给节奏与显现速度解耦；消息高度始终由显现进度驱动，解析领先不会提前撑高回答。输入器使用 state-based `TextFieldState` 在组件内持有编辑缓冲区，逐字编辑不会回写聊天页面状态，也不经过旧版 `CoreTextField` 管线。
+
+Markdown 空行只参与块结构解析，不按源码数量累加可见高度；稳定与流式渲染共用同一套块级排版，按正文、标题、列表、引用、代码和表格之间的关系分配留白，首块不额外下移。块间距使用随系统字体缩放的排版单位，普通段落之间保留约一个正文字符的间隔，标题前进一步扩大、标题后适度收紧，在大字体下仍保持清晰层级。Runtime 同时要求最终答复使用合法且克制的 GFM：普通交流优先短段落，仅在有助于分组、步骤或比较时使用标题、列表和表格，表格各行保持独立，避免把整句粗体当作标题。
 
 逐字效果由单个回答级帧时钟驱动。段落、标题、代码块和表格单元格先完成一次真实排版，再由 `DrawModifierNode` 按字素边界裁剪 `TextLayoutResult`；帧间推进只使绘制失效，不重建 Markdown AST、`AnnotatedString` 或文本布局。显现速度随积压自适应（48–240 字素/秒），积压时允许单帧补多个字素，避免输出稳定滞后于模型。行内语法闭合（加粗、行内代码、链接折叠）导致渲染文本变短时，显现进度保持单调前进，不回退重打已显示的文字。前缀路径按字素增量累计，只有显现跨入新行时才触发一次测量并增加消息高度，因此隐藏文本不会提前把当前回答顶出视口。Emoji ZWJ、肤色修饰、组合音标、国旗和代理对均作为完整字素显示，不会从 UTF-16 中间断开。
 

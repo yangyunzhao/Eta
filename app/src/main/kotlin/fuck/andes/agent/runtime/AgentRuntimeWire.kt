@@ -26,6 +26,7 @@ import kotlinx.serialization.json.Json
  * 不引入 AIDL：结构化字段使用 [Bundle]，图片正文使用 [ParcelFileDescriptor]，避免占用 Binder 事务缓冲区。
  */
 internal object AgentRuntimeWire {
+    const val AGENT_UI_HANDOFF_SOURCE = "agent_ui"
     const val ETA_VOICE_HANDOFF_SOURCE = "eta_voice"
 
     internal class PayloadTooLargeException(sizeBytes: Int) : IllegalArgumentException(
@@ -59,6 +60,18 @@ internal object AgentRuntimeWire {
 
     /** service -> client：请求图片已经摄取，入口进程可以关闭文件描述符并删除临时文件。 */
     const val MSG_REQUEST_INGESTED = 8
+
+    /** client -> service：查询当前仍在执行或提交终态的 run。 */
+    const val MSG_QUERY_ACTIVE_RUN = 9
+
+    /** service -> client：返回当前 active runId；空字符串表示没有。 */
+    const val MSG_QUERY_ACTIVE_RUN_RESPONSE = 10
+
+    /** client -> service：重新订阅指定 run 的安全事件重放、实时事件和最终结果。 */
+    const val MSG_ATTACH_RUN = 11
+
+    /** service -> client：返回是否成功重新订阅指定 run。 */
+    const val MSG_ATTACH_RUN_RESPONSE = 12
 
     private const val MODULE_PACKAGE = "fuck.andes"
     private const val SERVICE_CLASS = "fuck.andes.agent.runtime.AgentRuntimeService"
@@ -500,6 +513,13 @@ internal object AgentRuntimeWire {
         putString(KEY_RUN_ID, runId)
     }
 
+    fun attachRunResponseBundle(runId: String, attached: Boolean): Bundle = Bundle().apply {
+        putString(KEY_RUN_ID, runId)
+        putBoolean(KEY_OK, attached)
+    }
+
+    fun attachRunSucceeded(bundle: Bundle): Boolean = bundle.getBoolean(KEY_OK)
+
     fun runIdFromBundle(bundle: Bundle): String =
         bundle.getString(KEY_RUN_ID).orEmpty()
 
@@ -573,6 +593,7 @@ internal object AgentRuntimeWire {
                 putString("block_id", event.blockId)
                 putString("name", event.name)
                 putInt("content_chars", event.contentChars)
+                putString("replacement_content", event.replacementContent)
             }
 
             is AgentEvent.AssistantReceived -> {
@@ -703,6 +724,7 @@ internal object AgentRuntimeWire {
             blockId = bundle.getString("block_id"),
             name = bundle.getString("name"),
             contentChars = bundle.getInt("content_chars"),
+            replacementContent = bundle.getString("replacement_content"),
         )
 
         "assistant_received" -> AgentEvent.AssistantReceived(

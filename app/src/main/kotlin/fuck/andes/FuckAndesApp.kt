@@ -16,6 +16,7 @@ import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import fuck.andes.data.datastore.SettingsDataStore
 import fuck.andes.data.repository.AgentMemoryRepository
 import fuck.andes.data.repository.AppearanceSettingsRepository
+import fuck.andes.data.repository.McpServerRepository
 import fuck.andes.data.repository.ProviderRepository
 import fuck.andes.ui.app.PredictiveBackController
 import io.github.libxposed.service.XposedService
@@ -66,6 +67,7 @@ class FuckAndesApp : Application(), XposedServiceHelper.OnServiceListener {
             codexOAuthManager = oauthManager
             codexCredentialProvider = oauthManager.credentialProvider
         }
+        McpServerRepository.init(this)
         XposedServiceHelper.registerListener(this)
         applicationScope.launch {
             runCatching {

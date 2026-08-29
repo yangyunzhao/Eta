@@ -2,6 +2,7 @@ package fuck.andes.data.db
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
@@ -21,10 +22,21 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class FuckAndesDatabaseMigrationTest {
     @Test
-    fun migration6To16PreservesDataAndMovesBoundedConversationContext() {
+    fun migration6To19PreservesDataAndMovesBoundedConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
+
+        val migration17To18WithMcpData = Migration(17, 18) { database ->
+            FuckAndesDatabase.MIGRATION_17_18.migrate(database)
+            database.execSQL(
+                "INSERT INTO mcp_servers (id, name, url, enabled, protocol_mode, " +
+                    "authorization_type, tools_json, enabled_tool_names_json, created_at, " +
+                    "sort_order, last_refreshed_at, last_protocol_version) VALUES " +
+                    "('mcp-1', 'MCP', 'http://127.0.0.1:8787/mcp', 1, 'auto', 'none', " +
+                    "'[]', '[]', 1, 0, 2, '2026-07-28')"
+            )
+        }
 
         val database = Room.databaseBuilder(context, FuckAndesDatabase::class.java, databaseName)
             .addMigrations(
@@ -38,6 +50,9 @@ class FuckAndesDatabaseMigrationTest {
                 FuckAndesDatabase.MIGRATION_13_14,
                 FuckAndesDatabase.MIGRATION_14_15,
                 FuckAndesDatabase.MIGRATION_15_16,
+                FuckAndesDatabase.MIGRATION_16_17,
+                migration17To18WithMcpData,
+                FuckAndesDatabase.MIGRATION_18_19,
             )
             .build()
         try {
@@ -82,8 +97,14 @@ class FuckAndesDatabaseMigrationTest {
             val migratedMessage = runBlocking(Dispatchers.IO) {
                 database.conversationDao().messages().single()
             }
+            val inFlightRuns = runBlocking(Dispatchers.IO) {
+                database.runtimeRunDao().inFlightRuns()
+            }
+            val mcpServers = runBlocking(Dispatchers.IO) {
+                database.mcpServerDao().servers()
+            }
 
-            assertEquals(16, databaseVersion)
+            assertEquals(19, databaseVersion)
             assertEquals("保留的结果", result.content)
             assertEquals("[]", result.transcriptJson)
             assertEquals("保留的归档", archive.content)
@@ -108,6 +129,9 @@ class FuckAndesDatabaseMigrationTest {
             assertEquals("sk-existing", migratedProvider.second)
             assertEquals(false, provider.hostedWebSearchEnabled)
             assertEquals(false, migratedMessage.isEdited)
+            assertEquals(emptyList<RuntimeInFlightRunWithEvents>(), inFlightRuns)
+            assertEquals(listOf("mcp-1"), mcpServers.map { it.id })
+            assertEquals(null, mcpServers.single().toolsExpireAt)
             assertEquals(null, provider.models.first().contextWindowOverride)
             assertEquals(null, provider.models.first().reasoningOverride)
             assertEquals(null, provider.models.first().reasoningCapabilitiesOverride)
@@ -165,6 +189,57 @@ class FuckAndesDatabaseMigrationTest {
             ))
         } finally {
             helper.close()
+        }
+    }
+
+    @Test
+    fun migration16To19PreservesForkAuthAndAddsRuntimeMcpExpiry() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val databaseName = "migration-fork-v16-${UUID.randomUUID()}.db"
+        val helper = createVersion16Database(context, databaseName)
+        try {
+            val database = helper.writableDatabase
+            FuckAndesDatabase.MIGRATION_16_17.migrate(database)
+            FuckAndesDatabase.MIGRATION_17_18.migrate(database)
+            database.execSQL(
+                "INSERT INTO mcp_servers (id, name, url, enabled, protocol_mode, " +
+                    "authorization_type, tools_json, enabled_tool_names_json, created_at, " +
+                    "sort_order, last_refreshed_at, last_protocol_version) VALUES " +
+                    "('mcp-1', 'MCP', 'http://127.0.0.1:8787/mcp', 1, 'auto', 'none', " +
+                    "'[]', '[]', 1, 0, NULL, NULL)",
+            )
+            FuckAndesDatabase.MIGRATION_18_19.migrate(database)
+
+            assertEquals("codex_oauth", queryString(database, "SELECT auth_mode FROM model_providers"))
+            assertEquals("1", queryString(
+                database,
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' " +
+                    "AND name = 'runtime_inflight_runs'",
+            ))
+            assertNull(queryString(database, "SELECT tools_expire_at FROM mcp_servers WHERE id = 'mcp-1'"))
+        } finally {
+            helper.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun migration18To19PreservesUpstreamExpiryAndAddsForkAuthMode() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val databaseName = "migration-upstream-v18-${UUID.randomUUID()}.db"
+        val helper = createVersion18Database(context, databaseName)
+        try {
+            val database = helper.writableDatabase
+            FuckAndesDatabase.MIGRATION_18_19.migrate(database)
+
+            assertEquals("", queryString(database, "SELECT auth_mode FROM model_providers"))
+            assertEquals("1234", queryString(
+                database,
+                "SELECT tools_expire_at FROM mcp_servers WHERE id = 'mcp-1'",
+            ))
+        } finally {
+            helper.close()
+            context.deleteDatabase(databaseName)
         }
     }
 
@@ -303,6 +378,67 @@ class FuckAndesDatabaseMigrationTest {
                         } else {
                             db.execSQL("INSERT INTO provider_models (id) VALUES ('model')")
                         }
+                    }
+
+                    override fun onUpgrade(
+                        db: SupportSQLiteDatabase,
+                        oldVersion: Int,
+                        newVersion: Int,
+                    ) = Unit
+                },
+            )
+            .build()
+        return FrameworkSQLiteOpenHelperFactory().create(configuration).also { it.writableDatabase }
+    }
+
+    private fun createVersion16Database(
+        context: Context,
+        databaseName: String,
+    ): SupportSQLiteOpenHelper {
+        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(databaseName)
+            .callback(
+                object : SupportSQLiteOpenHelper.Callback(16) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL(
+                            "CREATE TABLE model_providers (id TEXT NOT NULL PRIMARY KEY, " +
+                                "auth_mode TEXT NOT NULL DEFAULT '')",
+                        )
+                        db.execSQL(
+                            "INSERT INTO model_providers (id, auth_mode) VALUES " +
+                                "('provider', 'codex_oauth')",
+                        )
+                    }
+
+                    override fun onUpgrade(
+                        db: SupportSQLiteDatabase,
+                        oldVersion: Int,
+                        newVersion: Int,
+                    ) = Unit
+                },
+            )
+            .build()
+        return FrameworkSQLiteOpenHelperFactory().create(configuration).also { it.writableDatabase }
+    }
+
+    private fun createVersion18Database(
+        context: Context,
+        databaseName: String,
+    ): SupportSQLiteOpenHelper {
+        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(databaseName)
+            .callback(
+                object : SupportSQLiteOpenHelper.Callback(18) {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE model_providers (id TEXT NOT NULL PRIMARY KEY)")
+                        db.execSQL("INSERT INTO model_providers (id) VALUES ('provider')")
+                        db.execSQL(
+                            "CREATE TABLE mcp_servers (id TEXT NOT NULL PRIMARY KEY, " +
+                                "tools_expire_at INTEGER)",
+                        )
+                        db.execSQL(
+                            "INSERT INTO mcp_servers (id, tools_expire_at) VALUES ('mcp-1', 1234)",
+                        )
                     }
 
                     override fun onUpgrade(

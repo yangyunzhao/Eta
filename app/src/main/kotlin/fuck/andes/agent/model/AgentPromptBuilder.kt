@@ -32,6 +32,9 @@ internal object AgentPromptBuilder {
                     "专用读取工具不存在、结果不足或数据源不可用时，只要 Root Shell、文件或终端工具当前已公开，就主动使用它们定位并只读检查" +
                     "相关应用私有文件与数据库；先识别路径、文件格式和数据库 schema，再执行有界查询，不修改源数据。" +
                     "结论必须说明实际证据与不确定性，不得编造未取得的数据。" +
+                    "最终答复使用合法且克制的 GitHub Flavored Markdown：普通交流默认用简短自然段；" +
+                    "只有分组、步骤或比较确实提升可读性时才使用标题、列表或表格，不用整句粗体冒充标题；" +
+                    "表格的表头、分隔行和每个数据行必须各自独占一行，表格前后留空行；不要为了显得结构化而滥用格式。" +
                     "需要看屏幕时先按默认参数调用 observe_screen，只读取 UI 树，不附截图；" +
                     "节点为空、目标无法唯一识别、界面以 Canvas、地图、图片或二维码等视觉内容为主，或任务依赖颜色、图像、空间布局时，" +
                     "再显式设置 include_screenshot=true；补截图时保持 include_ui_tree=true，让截图、节点与新的 observation_id 来自同一次观察，" +
@@ -56,8 +59,9 @@ internal object AgentPromptBuilder {
                     "任务需要在手机上执行命令、查看 Linux/Android 系统信息、读取/写入文件、查询包名或使用 shell 时，" +
                         "必须调用 terminal 或 run_command/read_file/write_file/list_directory 工具。" +
                         "Android 系统、应用、日志、Magisk 与设备文件操作使用 terminal 的 environment=android；" +
-                        "Python、Git、压缩打包、JSON 处理或编译工具优先使用 environment=linux；如果返回 LINUX_ENVIRONMENT_NOT_READY，" +
+                        "Git、压缩打包、JSON 处理或编译工具优先使用 environment=linux；如果返回 LINUX_ENVIRONMENT_NOT_READY，" +
                         "准确告知用户先到设置安装 Linux 工具环境，不要把 Android 缺少命令误报成设备不支持。" +
+                        "若 python3、pip、uv、node 或 npm 命令不存在，准确告知用户在 Linux 工具环境页面安装对应的“Python 工具”或“Node.js 环境”；需要 sshd 或 ssh-keygen 时引导安装“SSH 远程访问”；不要在 Android 环境冒充或自行下载未校验的工具。" +
                         "Linux 环境默认在 /workspace 工作，该目录与 Android 的 /data/local/tmp/fuck_andes 对应；" +
                         "共享存储可通过 /sdcard 使用，Linux 环境不能直接假定其他 Android 受保护路径可见。" +
                         "分析 APK 时优先在 linux 环境使用 jadx、apktool、smali 或 baksmali；若命令不存在，" +

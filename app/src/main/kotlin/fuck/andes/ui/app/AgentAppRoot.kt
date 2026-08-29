@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import fuck.andes.FuckAndesApp
 import fuck.andes.R
 import fuck.andes.agent.device.BoundedRootCommandExecutor
@@ -67,6 +68,8 @@ import fuck.andes.ui.screens.browser.AgentBrowserScreen
 import fuck.andes.ui.screens.enhance.SystemEnhanceScreen
 import fuck.andes.ui.screens.home.AgentHomeScreen
 import fuck.andes.ui.screens.memory.AgentMemoryScreen
+import fuck.andes.ui.screens.mcp.McpServerDetailScreen
+import fuck.andes.ui.screens.mcp.McpServersScreen
 import fuck.andes.ui.screens.permissions.PermissionHealthScreen
 import fuck.andes.ui.screens.skills.AgentSkillsScreen
 import fuck.andes.ui.screens.terminal.LinuxEnvironmentScreen
@@ -81,15 +84,10 @@ fun AgentAppRoot(
     onAssistantConversationOpened: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    val uiScope = rememberCoroutineScope()
     val backStack = rememberNavBackStack<AppRoute>(AppRoute.Home)
     val navigator = remember(backStack) { AgentNavigator(backStack) }
-    val agentState = remember(context.applicationContext) {
-        AgentAppState(
-            context = context.applicationContext,
-            scope = coroutineScope,
-        )
-    }
+    val agentState = viewModel<AgentAppViewModel>().state
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -360,7 +358,7 @@ fun AgentAppRoot(
                                     }
                                     "background" -> {
                                         if (Build.MANUFACTURER.lowercase() in setOf("oppo", "realme", "oneplus")) {
-                                            coroutineScope.launch(Dispatchers.IO) {
+                                            uiScope.launch(Dispatchers.IO) {
                                                 BoundedRootCommandExecutor(AndroidAgentLogger).use {
                                                     it.execute(
                                                         "am start --user current -n " +
@@ -428,7 +426,7 @@ fun AgentAppRoot(
                                         }
                                     }
                                     "root" -> {
-                                        coroutineScope.launch {
+                                        uiScope.launch {
                                             try {
                                                 val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
                                                 process.waitFor()
@@ -493,6 +491,18 @@ fun AgentAppRoot(
                 ModelProviderListScreen(
                     onNavigate = { route -> pushRoute(route) },
                     onBack = ::popRoute
+                )
+            }
+            entry<AppRoute.McpServers>(swipeDismiss = swipeDismiss) {
+                McpServersScreen(
+                    onNavigate = { route -> pushRoute(route) },
+                    onBack = ::popRoute,
+                )
+            }
+            entry<AppRoute.McpServerDetail>(swipeDismiss = swipeDismiss) { route ->
+                McpServerDetailScreen(
+                    serverId = route.serverId,
+                    onBack = ::popRoute,
                 )
             }
             entry<AppRoute.ModelProviderDetail>(swipeDismiss = swipeDismiss) { route ->

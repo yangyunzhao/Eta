@@ -19,6 +19,7 @@ import fuck.andes.data.provider.BuiltinProviders
 import fuck.andes.data.provider.ProviderSourceRegistry
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.json.JSONArray
 import org.json.JSONObject
 
 internal object AgentModelClient {
@@ -91,6 +92,7 @@ internal object AgentModelClient {
         runController: AgentRunController = AgentRunController(),
         skillContext: SkillContext = SkillContext.EMPTY,
         memoryContext: AgentMemoryContext = AgentMemoryContext.DISABLED,
+        additionalTools: JSONArray = JSONArray(),
         onEvent: (AgentEvent) -> Unit = {}
     ): ModelResponse.Text {
         config.validateForTest()
@@ -113,6 +115,9 @@ internal object AgentModelClient {
             skillGitHubInstall = true,
             memoryTools = memoryContext.enabled,
         )
+        for (index in 0 until additionalTools.length()) {
+            tools.put(additionalTools.opt(index))
+        }
         onEvent(
             AgentEvent.RunStarted(
                 initialImages = images.size,

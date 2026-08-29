@@ -39,12 +39,27 @@ internal object AgentPendingResultRecovery {
         )
         if (history.alreadyApplied) return Outcome(state, alreadyApplied = true)
 
-        val messagesWithResult = state.messages.toMutableList().also { messages ->
+        val messagesWithResult = state.messages
+            .filterNot { it is SystemNoticeMessageUi && it.id == interruptedNoticeId(runId) }
+            .toMutableList()
+            .also { messages ->
             val assistantIndex = messages.indexOfLast { it.isAssistantForRun(runId) }
+            val targetRound = (messages.getOrNull(assistantIndex) as? AgentMessageUi)
+                ?.id
+                ?.assistantRound(runId)
+            val sameRoundBlocks = targetRound?.let { round ->
+                messages.count { message ->
+                    message is AgentMessageUi && message.id.assistantRound(runId) == round
+                }
+            } ?: 0
             val completedMessage: AgentChatMessageUi = when {
                 content != null -> AgentMessageUi(
                     id = "assistant-$runId-1",
-                    content = content,
+                    content = if (sameRoundBlocks > 1) {
+                        (messages[assistantIndex] as AgentMessageUi).content.ifBlank { content }
+                    } else {
+                        content
+                    },
                     isStreaming = false,
                     renderMarkdown = true,
                 )
@@ -117,7 +132,15 @@ internal object AgentPendingResultRecovery {
 
     private fun assistantMessagePrefix(runId: String): String = "assistant-$runId-"
 
+    private fun String.assistantRound(runId: String): Int? =
+        removePrefix(assistantMessagePrefix(runId))
+            .takeIf { it != this }
+            ?.substringBefore('-')
+            ?.toIntOrNull()
+
     private fun supplementMessageId(runId: String, index: Int): String =
         "user-$runId-supplement-$index"
+
+    private fun interruptedNoticeId(runId: String): String = "interrupted-$runId"
 
 }

@@ -19,9 +19,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RuntimeResultEntity::class,
         RuntimeArchiveRunEntity::class,
         RuntimeArchiveEventEntity::class,
+        RuntimeInFlightRunEntity::class,
+        RuntimeInFlightEventEntity::class,
         SkillRegistryEntity::class,
+        McpServerEntity::class,
     ],
-    version = 16,
+    version = 19,
     exportSchema = false,
 )
 internal abstract class FuckAndesDatabase : RoomDatabase() {
@@ -29,6 +32,7 @@ internal abstract class FuckAndesDatabase : RoomDatabase() {
     abstract fun providerDao(): ProviderDao
     abstract fun runtimeRunDao(): RuntimeRunDao
     abstract fun skillDao(): SkillDao
+    abstract fun mcpServerDao(): McpServerDao
 
     companion object {
         @Volatile
@@ -52,6 +56,9 @@ internal abstract class FuckAndesDatabase : RoomDatabase() {
                         MIGRATION_13_14,
                         MIGRATION_14_15,
                         MIGRATION_15_16,
+                        MIGRATION_16_17,
+                        MIGRATION_17_18,
+                        MIGRATION_18_19,
                     )
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
@@ -72,6 +79,78 @@ internal abstract class FuckAndesDatabase : RoomDatabase() {
             )
             database.execSQL(
                 "ALTER TABLE runtime_archive_runs ADD COLUMN transcript_json TEXT NOT NULL DEFAULT '[]'"
+            )
+        }
+
+        internal val MIGRATION_16_17 = Migration(16, 17) { database ->
+            database.execSQL(
+                "CREATE TABLE IF NOT EXISTS runtime_inflight_runs (" +
+                    "run_id TEXT NOT NULL, " +
+                    "owner_instance_id TEXT NOT NULL, " +
+                    "handoff_id TEXT NOT NULL, " +
+                    "handoff_source TEXT NOT NULL, " +
+                    "handoff_payload TEXT NOT NULL, " +
+                    "dismiss_entry_surface INTEGER NOT NULL, " +
+                    "created_at INTEGER NOT NULL, " +
+                    "updated_at INTEGER NOT NULL, " +
+                    "PRIMARY KEY(run_id))"
+            )
+            database.execSQL(
+                "CREATE TABLE IF NOT EXISTS runtime_inflight_events (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "run_id TEXT NOT NULL, " +
+                    "sort_index INTEGER NOT NULL, " +
+                    "event_json TEXT NOT NULL, " +
+                    "FOREIGN KEY(run_id) REFERENCES runtime_inflight_runs(run_id) " +
+                    "ON UPDATE NO ACTION ON DELETE CASCADE)"
+            )
+            database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_runtime_inflight_events_run_id " +
+                    "ON runtime_inflight_events(run_id)"
+            )
+            database.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                    "index_runtime_inflight_events_run_id_sort_index " +
+                    "ON runtime_inflight_events(run_id, sort_index)"
+            )
+        }
+
+        internal val MIGRATION_17_18 = Migration(17, 18) { database ->
+            database.execSQL(
+                "CREATE TABLE IF NOT EXISTS mcp_servers (" +
+                    "id TEXT NOT NULL, " +
+                    "name TEXT NOT NULL, " +
+                    "url TEXT NOT NULL, " +
+                    "enabled INTEGER NOT NULL, " +
+                    "protocol_mode TEXT NOT NULL, " +
+                    "authorization_type TEXT NOT NULL, " +
+                    "tools_json TEXT NOT NULL, " +
+                    "enabled_tool_names_json TEXT NOT NULL, " +
+                    "created_at INTEGER NOT NULL, " +
+                    "sort_order INTEGER NOT NULL, " +
+                    "last_refreshed_at INTEGER, " +
+                    "last_protocol_version TEXT, " +
+                    "PRIMARY KEY(id))"
+            )
+        }
+
+        /**
+         * v18 exists in two released lineages: upstream has MCP tool expiry but no auth_mode,
+         * while this fork reaches v18 from its v16 schema and still needs tool expiry.  Bring
+         * either lineage to the shared v19 schema without overwriting existing columns or data.
+         */
+        internal val MIGRATION_18_19 = Migration(18, 19) { database ->
+            addColumnIfMissing(
+                database,
+                table = "model_providers",
+                column = "auth_mode",
+                sql = "ALTER TABLE model_providers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT ''",
+            )
+            addColumnIfMissing(
+                database,
+                table = "mcp_servers",
+                column = "tools_expire_at",
+                sql = "ALTER TABLE mcp_servers ADD COLUMN tools_expire_at INTEGER",
             )
         }
 
@@ -219,5 +298,6 @@ internal abstract class FuckAndesDatabase : RoomDatabase() {
             generateSequence { if (cursor.moveToNext()) cursor.getString(nameColumn) else null }
                 .any { it == column }
         }
+
     }
 }

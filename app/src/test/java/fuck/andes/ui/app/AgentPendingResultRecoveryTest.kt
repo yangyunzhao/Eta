@@ -7,6 +7,8 @@ import fuck.andes.ui.model.AgentChatUiState
 import fuck.andes.ui.model.AgentMessageUi
 import fuck.andes.ui.model.SystemNoticeCode
 import fuck.andes.ui.model.SystemNoticeMessageUi
+import fuck.andes.ui.model.ToolActivityMessageUi
+import fuck.andes.ui.model.ToolActivityStatusUi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -110,6 +112,51 @@ class AgentPendingResultRecoveryTest {
     }
 
     @Test
+    fun recoveryDoesNotMergeEarlierTextBlockIntoSameRoundFinalBlock() {
+        val state = AgentChatUiState(
+            messages = listOf(
+                AgentMessageUi(
+                    id = "assistant-run-blocks-1-1",
+                    content = "我先搜索。",
+                    isStreaming = false,
+                    renderMarkdown = true,
+                ),
+                AgentMessageUi(
+                    id = "assistant-run-blocks-1-3",
+                    content = "这是最终答案。",
+                    isStreaming = false,
+                    renderMarkdown = true,
+                ),
+            ),
+            input = "",
+            isStreaming = true,
+            thinkingEnabled = false,
+        )
+
+        val recovered = AgentPendingResultRecovery.apply(
+            state = state,
+            runId = "run-blocks",
+            result = AgentRuntimeWire.RunResult(
+                runId = "run-blocks",
+                ok = true,
+                content = "我先搜索。这是最终答案。",
+                transcript = listOf(
+                    AgentModelClient.ConversationMessage(
+                        role = "assistant",
+                        content = "我先搜索。这是最终答案。",
+                    ),
+                ),
+            ),
+            supplements = emptyList(),
+        )
+
+        assertEquals(
+            listOf("我先搜索。", "这是最终答案。"),
+            recovered.state.messages.filterIsInstance<AgentMessageUi>().map { it.content },
+        )
+    }
+
+    @Test
     fun recoveryUsesSemanticNoticeForSuccessfulRunWithoutText() {
         val recovered = AgentPendingResultRecovery.apply(
             state = AgentChatUiState(
@@ -130,6 +177,47 @@ class AgentPendingResultRecoveryTest {
         val message = recovered.state.messages.single() as SystemNoticeMessageUi
         assertEquals(SystemNoticeCode.EmptyResult, message.code)
         assertEquals(null, message.detail)
+    }
+
+    @Test
+    fun completedOutboxResultKeepsToolTraceAndRemovesInterruptedNotice() {
+        val tool = ToolActivityMessageUi(
+            id = "run-tool-tool-1-call-1",
+            toolName = "run_command",
+            status = ToolActivityStatusUi.Success,
+            argumentsSummary = "执行命令 · Android · root",
+            command = "uptime",
+            resultSummary = "完成",
+        )
+        val recovered = AgentPendingResultRecovery.apply(
+            state = AgentChatUiState(
+                messages = listOf(
+                    tool,
+                    SystemNoticeMessageUi(
+                        id = "interrupted-run-tool",
+                        code = SystemNoticeCode.Interrupted,
+                    ),
+                ),
+                input = "",
+                isStreaming = false,
+                thinkingEnabled = false,
+            ),
+            runId = "run-tool",
+            result = AgentRuntimeWire.RunResult(
+                runId = "run-tool",
+                ok = true,
+                content = "最终结果",
+                transcript = listOf(
+                    AgentModelClient.ConversationMessage(role = "assistant", content = "最终结果")
+                ),
+            ),
+            supplements = emptyList(),
+        )
+
+        assertFalse(recovered.alreadyApplied)
+        assertEquals(tool, recovered.state.messages.first())
+        assertTrue(recovered.state.messages.none { it.id == "interrupted-run-tool" })
+        assertEquals("最终结果", (recovered.state.messages.last() as AgentMessageUi).content)
     }
 
     @Test

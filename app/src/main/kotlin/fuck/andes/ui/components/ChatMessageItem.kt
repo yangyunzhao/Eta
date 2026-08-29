@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -60,15 +61,20 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
@@ -82,13 +88,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.takeOrElse
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.composables.icons.lucide.R as LucideR
 import com.mikepenz.markdown.annotator.annotatorSettings
 import com.mikepenz.markdown.annotator.buildMarkdownAnnotatedString
+import com.mikepenz.markdown.compose.LocalMarkdownA11yLabels
 import com.mikepenz.markdown.compose.LocalMarkdownComponents
+import com.mikepenz.markdown.compose.LocalMarkdownDimens
 import com.mikepenz.markdown.compose.LocalMarkdownPadding
 import com.mikepenz.markdown.compose.MarkdownElement
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
@@ -157,7 +168,6 @@ import top.yukonga.miuix.kmp.basic.TooltipBox
 import top.yukonga.miuix.kmp.basic.TooltipDefaults
 import top.yukonga.miuix.kmp.basic.rememberTooltipState
 import top.yukonga.miuix.kmp.squircle.squircleBorder
-import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -277,6 +287,7 @@ internal fun ChatMessageItem(
                                 SystemNoticeCode.Stopped -> R.string.system_notice_stopped
                                 SystemNoticeCode.EmptyResult -> R.string.system_notice_empty_result
                                 SystemNoticeCode.RuntimeFailed -> R.string.system_notice_runtime_failed
+                                SystemNoticeCode.Interrupted -> R.string.system_notice_interrupted
                             },
                         ),
                     )
@@ -810,6 +821,14 @@ private fun StableMarkdown(
                 modifier = it,
             )
         },
+        success = { state, successComponents, successModifier ->
+            ChatMarkdownDocument(
+                root = state.node,
+                content = state.content,
+                components = successComponents,
+                modifier = successModifier,
+            )
+        },
     )
 }
 
@@ -972,17 +991,98 @@ private fun StreamingGfmSuccess(
         revealCoordinator.retainBlocks(activeRevealBlocks)
     }
 
+    ChatMarkdownDocument(
+        root = state.node,
+        content = state.content,
+        components = components,
+        modifier = modifier,
+    )
+}
+
+/**
+ * 空行只负责切分 Markdown 块，不直接占据布局高度；可见块之间按语义分配留白，
+ * 避免统一 block padding 让标题、正文、列表和表格失去层级。
+ */
+@Composable
+private fun ChatMarkdownDocument(
+    root: ASTNode,
+    content: String,
+    components: MarkdownComponents,
+    modifier: Modifier = Modifier,
+) {
+    val blocks = remember(root) { topLevelMarkdownBlocks(root) }
+    val density = LocalDensity.current
     Column(modifier) {
-        state.node.children.forEach { node ->
+        blocks.forEachIndexed { index, node ->
+            val previousType = blocks.getOrNull(index - 1)?.type
+            val gap = with(density) {
+                markdownBlockSpacing(previousType, node.type).toDp()
+            }
+            if (gap > 0.dp) Spacer(Modifier.height(gap))
             key(node.startOffset, node.type.name) {
                 MarkdownElement(
                     node = node,
                     components = components,
-                    content = state.content,
+                    content = content,
+                    includeSpacer = false,
                 )
             }
         }
     }
+}
+
+internal fun topLevelMarkdownBlocks(root: ASTNode): List<ASTNode> =
+    root.children.filterNot { node -> node.type == MarkdownTokenTypes.EOL }
+
+internal fun markdownBlockSpacing(previous: IElementType?, current: IElementType): TextUnit {
+    if (previous == null) return 0.sp
+    if (previous.isMarkdownHeading() && current.isMarkdownHeading()) return 12.sp
+    if (current.isMarkdownHeading()) {
+        return if (current == MarkdownElementTypes.ATX_1 ||
+            current == MarkdownElementTypes.SETEXT_1 ||
+            current == MarkdownElementTypes.ATX_2 ||
+            current == MarkdownElementTypes.SETEXT_2
+        ) {
+            24.sp
+        } else {
+            20.sp
+        }
+    }
+    if (previous.isMarkdownHeading()) return 10.sp
+    if (previous.isMarkdownParagraph() && current.isMarkdownParagraph()) return 16.sp
+    if (previous.isMarkdownStructuredBlock() || current.isMarkdownStructuredBlock()) return 16.sp
+    return 14.sp
+}
+
+private fun IElementType.isMarkdownHeading(): Boolean = when (this) {
+    MarkdownElementTypes.ATX_1,
+    MarkdownElementTypes.ATX_2,
+    MarkdownElementTypes.ATX_3,
+    MarkdownElementTypes.ATX_4,
+    MarkdownElementTypes.ATX_5,
+    MarkdownElementTypes.ATX_6,
+    MarkdownElementTypes.SETEXT_1,
+    MarkdownElementTypes.SETEXT_2,
+    -> true
+
+    else -> false
+}
+
+private fun IElementType.isMarkdownParagraph(): Boolean =
+    this == MarkdownElementTypes.PARAGRAPH || this == MarkdownTokenTypes.TEXT
+
+private fun IElementType.isMarkdownStructuredBlock(): Boolean = when (this) {
+    MarkdownElementTypes.ORDERED_LIST,
+    MarkdownElementTypes.UNORDERED_LIST,
+    MarkdownElementTypes.BLOCK_QUOTE,
+    MarkdownElementTypes.CODE_BLOCK,
+    MarkdownElementTypes.CODE_FENCE,
+    MarkdownElementTypes.IMAGE,
+    MarkdownTokenTypes.HORIZONTAL_RULE,
+    TABLE,
+    -> true
+
+    else -> false
 }
 
 internal data class StreamingMarkdownTarget(
@@ -1015,8 +1115,8 @@ private enum class ChatMarkdownTone {
 @Composable
 private fun chatMarkdownTypography(tone: ChatMarkdownTone) = markdownTypography(
     h1 = chatMarkdownBodyStyle(tone).copy(
-        fontSize = if (tone == ChatMarkdownTone.Answer) 20.sp else 17.sp,
-        lineHeight = if (tone == ChatMarkdownTone.Answer) 28.sp else 25.sp,
+        fontSize = if (tone == ChatMarkdownTone.Answer) 21.sp else 17.sp,
+        lineHeight = if (tone == ChatMarkdownTone.Answer) 29.sp else 25.sp,
         fontWeight = FontWeight.Bold,
     ),
     h2 = chatMarkdownBodyStyle(tone).copy(
@@ -1027,22 +1127,22 @@ private fun chatMarkdownTypography(tone: ChatMarkdownTone) = markdownTypography(
     h3 = chatMarkdownBodyStyle(tone).copy(
         fontSize = if (tone == ChatMarkdownTone.Answer) 18.sp else 15.sp,
         lineHeight = if (tone == ChatMarkdownTone.Answer) 26.sp else 23.sp,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
     ),
     h4 = chatMarkdownBodyStyle(tone).copy(
         fontSize = if (tone == ChatMarkdownTone.Answer) 17.sp else 14.sp,
         lineHeight = if (tone == ChatMarkdownTone.Answer) 25.sp else 22.sp,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
     ),
     h5 = chatMarkdownBodyStyle(tone).copy(
         fontSize = if (tone == ChatMarkdownTone.Answer) 16.sp else 14.sp,
         lineHeight = if (tone == ChatMarkdownTone.Answer) 24.sp else 22.sp,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
     ),
     h6 = chatMarkdownBodyStyle(tone).copy(
         fontSize = if (tone == ChatMarkdownTone.Answer) 15.sp else 14.sp,
         lineHeight = if (tone == ChatMarkdownTone.Answer) 23.sp else 22.sp,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
     ),
     text = chatMarkdownBodyStyle(tone),
     paragraph = chatMarkdownBodyStyle(tone),
@@ -1120,7 +1220,8 @@ private fun chatMarkdownDimens() = markdownDimens(
 
 @Composable
 private fun chatMarkdownPadding() = markdownPadding(
-    block = 7.dp,
+    // 顶层块由 ChatMarkdownDocument 按语义分配留白，库的统一前置间距保持关闭。
+    block = 0.dp,
     list = 3.dp,
     listItemTop = 3.dp,
     listItemBottom = 3.dp,
@@ -1177,17 +1278,16 @@ private fun chatMarkdownComponents(
             suppressEmptyMarker = suppressEmptyListMarkers,
         )
     },
-    heading1 = { ChatHeadingBlock(it, it.typography.h1, topPadding = 14.dp, revealCoordinator = revealCoordinator) },
-    heading2 = { ChatHeadingBlock(it, it.typography.h2, topPadding = 13.dp, revealCoordinator = revealCoordinator) },
-    heading3 = { ChatHeadingBlock(it, it.typography.h3, topPadding = 12.dp, revealCoordinator = revealCoordinator) },
-    heading4 = { ChatHeadingBlock(it, it.typography.h4, topPadding = 10.dp, revealCoordinator = revealCoordinator) },
-    heading5 = { ChatHeadingBlock(it, it.typography.h5, topPadding = 9.dp, revealCoordinator = revealCoordinator) },
-    heading6 = { ChatHeadingBlock(it, it.typography.h6, topPadding = 8.dp, revealCoordinator = revealCoordinator) },
+    heading1 = { ChatHeadingBlock(it, it.typography.h1, revealCoordinator = revealCoordinator) },
+    heading2 = { ChatHeadingBlock(it, it.typography.h2, revealCoordinator = revealCoordinator) },
+    heading3 = { ChatHeadingBlock(it, it.typography.h3, revealCoordinator = revealCoordinator) },
+    heading4 = { ChatHeadingBlock(it, it.typography.h4, revealCoordinator = revealCoordinator) },
+    heading5 = { ChatHeadingBlock(it, it.typography.h5, revealCoordinator = revealCoordinator) },
+    heading6 = { ChatHeadingBlock(it, it.typography.h6, revealCoordinator = revealCoordinator) },
     setextHeading1 = {
         ChatHeadingBlock(
             it,
             it.typography.h1,
-            topPadding = 14.dp,
             setext = true,
             revealCoordinator = revealCoordinator,
         )
@@ -1196,7 +1296,6 @@ private fun chatMarkdownComponents(
         ChatHeadingBlock(
             it,
             it.typography.h2,
-            topPadding = 13.dp,
             setext = true,
             revealCoordinator = revealCoordinator,
         )
@@ -1245,6 +1344,9 @@ private fun chatMarkdownComponents(
             revealCoordinator = revealCoordinator,
         )
     },
+    blockQuote = { model ->
+        ChatBlockQuote(model)
+    },
 )
 
 /**
@@ -1286,11 +1388,6 @@ private fun ChatMarkdownList(
                 val checkboxNode = remember(item) {
                     item.children.firstOrNull { child -> child.type == CHECK_BOX }
                 }
-                val markerText = if (ordered) {
-                    "${initialListNumber + index}. "
-                } else {
-                    "• "
-                }
                 val markerVisible = streamingListMarkerVisible(
                     coordinatorActive = suppressEmptyMarker,
                     firstRevealKey = firstRevealKey,
@@ -1321,13 +1418,37 @@ private fun ChatMarkdownList(
                                     typography = model.typography,
                                 ),
                             )
-                        } else {
+                        } else if (ordered) {
                             Text(
-                                text = markerText,
-                                style = if (ordered) model.typography.ordered else model.typography.bullet,
+                                text = "${initialListNumber + index}.",
+                                style = model.typography.ordered.copy(
+                                    color = MiuixTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold,
+                                ),
+                            )
+                        } else {
+                            // Compose 单行 Text 在默认 Trim.Both 下忽略 lineHeight，行框即字体自然行高；
+                            // marker 必须与正文同 fontSize/lineHeight 才能共享度规对齐，
+                            // 层级差异只通过字形与颜色表达。
+                            val bulletDepth = depth % 3
+                            Text(
+                                text = when (bulletDepth) {
+                                    0 -> "•"
+                                    1 -> "◦"
+                                    else -> "▪"
+                                },
+                                style = model.typography.bullet.copy(
+                                    color = if (bulletDepth == 2) {
+                                        MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                    } else {
+                                        MiuixTheme.colorScheme.primary
+                                    },
+                                ),
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     Column {
                         item.children.forEach { child ->
@@ -1469,38 +1590,35 @@ private fun ChatRevealAnnotatedText(
 }
 
 /**
- * 标题块：在库默认的块间距之上再补段前距，让标题与上文拉开层级。
+ * 标题自身只负责文字样式；与相邻块的距离由文档级排版统一决定。
  */
 @Composable
 private fun ChatHeadingBlock(
     model: MarkdownComponentModel,
     style: TextStyle,
-    topPadding: Dp,
     setext: Boolean = false,
     revealCoordinator: SmoothTextRevealCoordinator? = null,
 ) {
-    Column(modifier = Modifier.padding(top = topPadding)) {
-        val contentChildType = if (setext) {
-            MarkdownTokenTypes.SETEXT_CONTENT
-        } else {
-            MarkdownTokenTypes.ATX_CONTENT
-        }
-        if (revealCoordinator == null || model.node.containsMarkdownImage()) {
-            MarkdownHeader(
-                content = model.content,
-                node = model.node,
-                style = style,
-                contentChildType = contentChildType,
-            )
-        } else {
-            ChatRevealMarkdownText(
-                model = model,
-                style = style,
-                revealCoordinator = revealCoordinator,
-                contentChildType = contentChildType,
-                modifier = Modifier.semantics { heading() },
-            )
-        }
+    val contentChildType = if (setext) {
+        MarkdownTokenTypes.SETEXT_CONTENT
+    } else {
+        MarkdownTokenTypes.ATX_CONTENT
+    }
+    if (revealCoordinator == null || model.node.containsMarkdownImage()) {
+        MarkdownHeader(
+            content = model.content,
+            node = model.node,
+            style = style,
+            contentChildType = contentChildType,
+        )
+    } else {
+        ChatRevealMarkdownText(
+            model = model,
+            style = style,
+            revealCoordinator = revealCoordinator,
+            contentChildType = contentChildType,
+            modifier = Modifier.semantics { heading() },
+        )
     }
 }
 
@@ -1747,6 +1865,68 @@ private fun ChatMarkdownTableCell(
     )
 }
 
+/**
+ * 引用块：圆角浅色竖条 + 弱化文字。
+ * 库默认实现把竖条颜色绑死在 quote 文字颜色上，无法分别控制，因此竖条自绘；
+ * 子节点仍交给 ambient components，流式显现与嵌套引用行为不变。
+ */
+@Composable
+private fun ChatBlockQuote(model: MarkdownComponentModel) {
+    val components = LocalMarkdownComponents.current
+    val padding = LocalMarkdownPadding.current
+    val dimens = LocalMarkdownDimens.current
+    val a11yLabels = LocalMarkdownA11yLabels.current
+    val barColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.4f)
+    val emptyLineHeight = with(LocalDensity.current) {
+        model.typography.quote.lineHeight.takeOrElse { 22.sp }.toDp()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = a11yLabels.blockquote }
+            .drawBehind {
+                val thickness = dimens.blockQuoteThickness.toPx()
+                val x = padding.blockQuoteBar
+                    .calculateStartPadding(LayoutDirection.Ltr).toPx() + thickness / 2
+                drawLine(
+                    color = barColor,
+                    strokeWidth = thickness,
+                    start = Offset(x, padding.blockQuoteBar.calculateTopPadding().toPx()),
+                    end = Offset(
+                        x,
+                        size.height - padding.blockQuoteBar.calculateBottomPadding().toPx(),
+                    ),
+                    cap = StrokeCap.Round,
+                )
+            }
+            .padding(padding.blockQuote),
+    ) {
+        model.node.children.forEach { child ->
+            key(child.startOffset) {
+                when (child.type) {
+                    MarkdownElementTypes.BLOCK_QUOTE -> ChatBlockQuote(
+                        MarkdownComponentModel(
+                            content = model.content,
+                            node = child,
+                            typography = model.typography,
+                        ),
+                    )
+
+                    MarkdownTokenTypes.EOL -> Spacer(Modifier.height(emptyLineHeight))
+
+                    else -> MarkdownElement(
+                        node = child,
+                        components = components,
+                        content = model.content,
+                        includeSpacer = false,
+                    )
+                }
+            }
+        }
+    }
+}
+
 private fun ASTNode.containsMarkdownImage(): Boolean =
     type == MarkdownElementTypes.IMAGE || children.any { child -> child.containsMarkdownImage() }
 
@@ -1920,7 +2100,7 @@ private fun ThinkingRow(
                 text = if (message.isStreaming) {
                     stringResource(R.string.reasoning_in_progress)
                 } else {
-                    message.elapsedSeconds?.let { seconds ->
+                    message.elapsedSeconds?.takeIf { it > 0 }?.let { seconds ->
                         pluralStringResource(
                             R.plurals.reasoning_completed_seconds,
                             seconds,
@@ -2024,6 +2204,16 @@ private fun ToolActivityInline(
             else -> null
         }
     }
+    // 失败原因直接显示在折叠行，不必展开卡片；剥离去重「失败」前缀与日志用的 code= 尾巴
+    val failureSubtitle = if (message.status == ToolActivityStatusUi.Failed) {
+        message.resultSummary
+            ?.lineSequence()?.firstOrNull()
+            ?.removePrefix("失败 · ")
+            ?.substringBefore(" · code=")
+            ?.takeIf { it.isNotBlank() && it != "失败" }
+    } else {
+        null
+    }
 
     Column(
         modifier = modifier
@@ -2046,6 +2236,7 @@ private fun ToolActivityInline(
                 tint = when (message.status) {
                     ToolActivityStatusUi.Running -> MiuixTheme.colorScheme.primary
                     ToolActivityStatusUi.Failed -> StatusError
+                    ToolActivityStatusUi.Unknown -> MiuixTheme.colorScheme.onSurfaceVariantSummary
                     ToolActivityStatusUi.Success ->
                         MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.8f)
                 }
@@ -2065,11 +2256,16 @@ private fun ToolActivityInline(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (browserSubtitle != null) {
+                val subtitle = failureSubtitle ?: browserSubtitle
+                if (subtitle != null) {
                     Text(
-                        text = browserSubtitle,
+                        text = subtitle,
                         style = MiuixTheme.textStyles.footnote2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.8f),
+                        color = if (failureSubtitle != null) {
+                            StatusError
+                        } else {
+                            MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.8f)
+                        },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -2090,24 +2286,34 @@ private fun ToolActivityInline(
                     },
                     label = "tool_status",
                 ) { status ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier.graphicsLayer(
-                            alpha = if (status == ToolActivityStatusUi.Running) pulseAlpha else 1f
-                        ),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(status.statusColor())
+                    // 成功是常态，只留低饱和度对勾；运行中与失败才占用视觉注意力
+                    if (status == ToolActivityStatusUi.Success) {
+                        Icon(
+                            painter = painterResource(LucideR.drawable.lucide_ic_check),
+                            contentDescription = stringResource(R.string.tool_status_success),
+                            modifier = Modifier.size(13.dp),
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f),
                         )
-                        Text(
-                            text = status.statusLabel(),
-                            style = MiuixTheme.textStyles.footnote2,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.8f),
-                        )
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.graphicsLayer(
+                                alpha = if (status == ToolActivityStatusUi.Running) pulseAlpha else 1f
+                            ),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(status.statusColor())
+                            )
+                            Text(
+                                text = status.statusLabel(),
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.8f),
+                            )
+                        }
                     }
                 }
                 Icon(
@@ -2152,7 +2358,9 @@ private fun ToolActivityInline(
                     Text(
                         text = message.resultSummary,
                         style = MiuixTheme.textStyles.footnote2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 10,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 if (showBrowserShortcut) {
@@ -2512,6 +2720,7 @@ private fun ToolActivityStatusUi.statusColor() = when (this) {
     ToolActivityStatusUi.Running -> StatusRunning
     ToolActivityStatusUi.Success -> StatusSuccess
     ToolActivityStatusUi.Failed -> StatusError
+    ToolActivityStatusUi.Unknown -> MiuixTheme.colorScheme.onSurfaceVariantSummary
 }
 
 @Composable
@@ -2519,6 +2728,7 @@ private fun ToolActivityStatusUi.statusLabel(): String = when (this) {
     ToolActivityStatusUi.Running -> stringResource(R.string.tool_status_running)
     ToolActivityStatusUi.Success -> stringResource(R.string.tool_status_success)
     ToolActivityStatusUi.Failed -> stringResource(R.string.tool_status_failed)
+    ToolActivityStatusUi.Unknown -> stringResource(R.string.tool_status_unknown)
 }
 
 @Composable
