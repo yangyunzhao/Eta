@@ -29,11 +29,13 @@
 | OAuth/Room/Responses/Runtime/MCP 与版本策略定向回归 | 通过：19 组 JVM 测试，均使用 MockWebServer 或本地替身。 |
 | Android Lint | 通过：`:app:lint`。 |
 | Release 编译 | 通过：`:app:assembleRelease`。 |
-| Release APK | `release/Eta-v3.0.0.znmlr.1-release-unsigned.apk`，`fuck.andes`，`3.0.0.znmlr.1` / `2026083101`，SHA-256 `4CE71327DEFE66F54A86839524FA6F5A4CB07B7FF9E6C3E7BE104A5D829241AD`。 |
+| Release APK | `release/Eta-v3.0.0.znmlr.1-release.apk`，`fuck.andes`，`3.0.0.znmlr.1` / `2026083101`，APK Signature Scheme v2，证书 SHA-256 `44:4D:EB:65:E1:19:AE:74:38:6D:76:D2:16:FC:EE:70:62:B8:A9:0C:68:AF:28:DE:29:53:BE:24:D7:1D:C7:91`，文件 SHA-256 `AC45CC8F97EA3B05F20F2F0E7E9DF175D24AA95DA60E11C6E68EBCD11C4D2301`。 |
+| 真机覆盖安装与基础自测 | 通过：维护者于 2026-08-31 从已安装 `v2.6.5.znmlr.1` 的设备完成覆盖安装并反馈无问题。 |
 | 完整 JVM 回归 | `836` 项完成，`25` 项失败，`7` 项跳过；失败均为 Windows/Robolectric 下的 POSIX shell、Linux 子进程、文件/SQLite sidecar 前提，未发现 OAuth/Room/Responses 定向回归失败。 |
 
-## 未完成的发布验证
+## 发布前状态与未完成验证
 
-- 当前环境未设置 Release keystore 的四项环境变量，APK 未签名，不能分发、tag 或创建 GitHub Release。
+- 本地已从当前 Windows 用户的 DPAPI 保护恢复材料加载签名信息，并验证新旧 APK 的证书指纹一致；恢复材料不得复制、提交或打印。
+- 用户已手动覆盖安装 `v3.0.0.znmlr.1` 并反馈无问题；这不替代 GitHub Actions、tag 或 GitHub Release 验证，当前仍不能称为正式发布。
 - 25 个完整 JVM 失败集中于 POSIX `sh`、Android/Linux 子进程、临时文件预览与 SQLite sidecar 行为；仍需在 Linux/Android 适配环境复跑。
 - 不执行真实 Codex 账号调用；设备码登录、刷新和真实 SSE 需由最终人工验收，并明确消耗共享额度。
