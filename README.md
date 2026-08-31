@@ -11,11 +11,11 @@
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| Codex OAuth 设备码登录 | 已发布 `v2.6.5.znmlr.1`；已合入上游 `v3.0.0` | 认证、加密凭据、刷新、安全 IPC、Codex Responses、固定模型目录、设备码设置页、MCP、运行恢复与跨协议流式块支持均已保留；`v3.0.0.znmlr.1` 已完成本地同证书签名构建，尚未发布 |
+| Codex OAuth 设备码登录 | 已发布 `v3.0.0.znmlr.1` | 认证、加密凭据、刷新、安全 IPC、Codex Responses、固定模型目录、设备码设置页、MCP、运行恢复与跨协议流式块支持均已保留；本次已合入上游 `v3.0.0` 的终端、Kimi、备份、MCP 请求头与工具调用改进 |
 
 使用流程是：在内置 OpenAI Provider 选择 `CODEX_OAUTH`，由 Eta 展示设备码并打开固定 OpenAI 验证页，用户授权后应用通过轮询完成登录。整个流程不使用浏览器回调、Deep Link、WebView 或本地 HTTP 回调服务器。当前已验证的可靠路径是让 Eta 保持前台，并在电脑或另一台设备打开 `https://auth.openai.com/codex/device` 输入验证码；部分手机在切到同机浏览器后会回收 Eta 进程，导致本轮内存登录会话丢失。使用者无需再填写 OpenAI Platform API Key，但请求会消耗登录账号的 Codex 共享额度；共享额度不是无限免费，具体可用量受账号与服务策略约束。
 
-当前正式发布版本仍为 [`v2.6.5.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v2.6.5.znmlr.1)（`versionCode 26501`）。当前本地集成基于上游 [`v3.0.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.0)（`0a90eac28a10e34d7b63d5b240afaa2621000282`），版本为 `v3.0.0.znmlr.1` / `2026083101`；已完成与当前正式版相同证书的本地签名构建及用户手动覆盖安装自测，尚未创建 tag、GitHub Release 或发布资产。
+当前正式发布版本为 [`v3.0.0.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.0.znmlr.1)（`versionCode 2026083101`），基于上游 [`v3.0.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.0)（`0a90eac28a10e34d7b63d5b240afaa2621000282`）。tag CI run `33362303670` 已完成完整单元测试、Lint、签名构建和 APK 校验；公开 Release asset 的 SHA-256 为 `4CD22065D902637466E66DCFDB110E25EFF59884782CF59F036C3CE8D2A57BE3`。用户已完成同证书覆盖安装自测并反馈无问题。
 
 2026-08-31 已按最新官方 Codex CLI `rust-v0.151.0`（peeled `78c290807ce710180111df227df3b7a4fe845452`）核对设备码、刷新、Responses、模型目录与 SSE 终态。未发现必须迁移的不兼容，因此 `CODEX_PROTOCOL_COMPAT_VERSION` 继续表示已完整验证的 `0.147.0` 基线，不机械升级。真实 OAuth 调用、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需最终人工验收。
 
@@ -51,7 +51,7 @@ v<上游版本>.znmlr.<下游序号>
 - 同一上游基线继续发布时递增为 `v2.6.0.znmlr.2`、`v2.6.0.znmlr.3`。
 - 上游升级后序号重置；例如升级到 `v2.7.0` 后从 `v2.7.0.znmlr.1` 开始。
 - `znmlr` 是固定的下游标签，release 和 tag 只发布到个人仓库 `origin`。
-- 当前已发布 `v2.6.5.znmlr.1`，对应 `versionName 2.6.5.znmlr.1` 和 `versionCode 26501`；本地签名构建为 `v3.0.0.znmlr.1` / `2026083101`，尚未发布。
+- 当前已发布 `v3.0.0.znmlr.1`，对应 `versionName 3.0.0.znmlr.1` 和 `versionCode 2026083101`；`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 保留为历史发布记录。
 
 ## 当前开发原则
 
