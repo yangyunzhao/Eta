@@ -38,7 +38,7 @@
     </queries>
 
     <application
-        android:name=".FuckAndesApp"
+        android:name=".EtaApp"
         android:allowBackup="false"
         android:description="@string/xposed_description"
         android:enableOnBackInvokedCallback="true"
@@ -53,7 +53,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.FuckAndes"
+            android:theme="@style/Theme.Eta"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

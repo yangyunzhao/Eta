@@ -30,7 +30,11 @@ import fuck.andes.agent.skill.GitHubSkillRepository
 import fuck.andes.agent.skill.GitHubSkillSourceException
 import fuck.andes.agent.skill.PublicGitHubSkillSource
 import fuck.andes.agent.terminal.AlpineEnvironmentPaths
+import fuck.andes.agent.terminal.DetachedTaskSupervisor
+import fuck.andes.agent.terminal.LinuxEnvironmentPaths
+import fuck.andes.agent.terminal.terminalEnvironment
 import fuck.andes.agent.terminal.RootShellTerminalController
+import fuck.andes.agent.terminal.SharedFolderMounts
 import fuck.andes.config.Prefs
 import fuck.andes.core.AgentLogger
 import fuck.andes.core.HookSupport
@@ -38,6 +42,7 @@ import fuck.andes.data.repository.AgentMemoryException
 import fuck.andes.data.repository.AgentMemoryMutation
 import fuck.andes.data.repository.AgentMemoryRepository
 import fuck.andes.data.repository.AgentMemoryWriteResult
+import fuck.andes.data.repository.LinuxEnvironmentSettingsRepository
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -96,9 +101,28 @@ internal class AgentLocalTools(
     private val terminalController = RootShellTerminalController(
         logger = logger,
         linuxRootfsPath = AlpineEnvironmentPaths.rootfsDir(context).absolutePath,
+        linuxRootfsPathProvider = { environment ->
+            environment.linuxDistribution?.let { distribution ->
+                LinuxEnvironmentPaths.rootfsDir(context, distribution).absolutePath
+            }
+        },
+        detachedSupervisor = DetachedTaskSupervisor(
+            logger = logger,
+            recordsFile = DetachedTaskSupervisor.defaultRecordsFile(context),
+            linuxRootfsPath = AlpineEnvironmentPaths.rootfsDir(context).absolutePath,
+            linuxRootfsPathProvider = { environment ->
+                environment.linuxDistribution?.let { distribution ->
+                    LinuxEnvironmentPaths.rootfsDir(context, distribution).absolutePath
+                }
+            },
+            linuxSharedMountsProvider = { SharedFolderMounts.current() },
+        ),
+        linuxSharedMountsProvider = { SharedFolderMounts.current() },
+        selectedLinuxEnvironmentProvider = {
+            LinuxEnvironmentSettingsRepository.current(context).terminalEnvironment
+        },
     )
     private val publishedObservation = AtomicReference(PublishedObservation())
-    private val clockMutationFingerprints = ConcurrentHashMap.newKeySet<String>()
     private val runAvailableSkillIds = runAvailableSkillIds
         .mapTo(mutableSetOf(), SkillParser::normalizeSkillLookup)
     private val mutatedSkillIds = ConcurrentHashMap.newKeySet<String>()
@@ -120,27 +144,8 @@ internal class AgentLocalTools(
     override fun execute(toolCall: AgentModelClient.ToolCall): AgentModelClient.ToolResult =
         runCatching {
             val args = JSONObject(toolCall.argumentsJson.ifBlank { "{}" })
-            ToolArgumentContract.validate(toolCall.name, args)?.let { issue ->
-                return@runCatching textResult(
-                    errorResult(
-                        code = "INVALID_ARGUMENT",
-                        message = issue.message,
-                    ),
-                )
-            }
             deviceToolPermissionError(toolCall.name)?.let { return@runCatching it }
             memoryToolPermissionError(toolCall.name)?.let { return@runCatching it }
-            if (
-                toolCall.name in CLOCK_MUTATION_TOOLS &&
-                !clockMutationFingerprints.add("${toolCall.name}:${args}")
-            ) {
-                return@runCatching textResult(
-                    errorResult(
-                        "CLOCK_RETRY_BLOCKED",
-                        "本轮已提交过完全相同的时钟操作；为避免重复创建，禁止自动重试",
-                    ),
-                )
-            }
             when (val decision = beforeToolExecution(toolCall.name)) {
                 ToolExecutionDecision.Allow -> Unit
                 is ToolExecutionDecision.Reject -> {
@@ -675,6 +680,7 @@ internal class AgentLocalTools(
             maxChars = args.optInt("max_chars", 8_000),
             closeIfDone = args.optBoolean("close_if_done", false),
             environment = args.optString("environment", "android"),
+            taskId = args.optString("task_id").ifBlank { null },
         )
     }
 
@@ -694,7 +700,7 @@ internal class AgentLocalTools(
 
     private fun listDirectory(args: JSONObject): String =
         terminalController.listDirectory(
-            path = args.optString("path", "/data/local/tmp/fuck_andes"),
+            path = args.optString("path", "/data/local/tmp/eta"),
             showHidden = args.optBoolean("show_hidden", false),
             limit = args.optInt("limit", 80)
         )
@@ -1346,7 +1352,6 @@ internal class AgentLocalTools(
         val DEVICE_TOOL_NAMES =
             DEVICE_DIRECT_TOOL_NAMES + DEVICE_SENSITIVE_READ_TOOL_NAMES +
                 DEVICE_SENSITIVE_ACTION_TOOL_NAMES
-        val CLOCK_MUTATION_TOOLS = setOf("set_alarm", "set_timer")
         val MEMORY_TOOL_NAMES = setOf("memory_get", "memory_write")
     }
 }

@@ -2,7 +2,7 @@ package fuck.andes.agent.runtime
 
 import android.content.Context
 import fuck.andes.agent.model.AgentModelClient
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,7 +21,7 @@ class AgentRunCheckpointStoreTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
-        FuckAndesDatabase.closeForTests()
+        EtaDatabase.closeForTests()
         context.deleteDatabase("fuck_andes.db")
     }
 

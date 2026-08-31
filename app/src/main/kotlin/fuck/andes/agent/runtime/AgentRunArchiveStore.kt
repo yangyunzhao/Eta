@@ -3,7 +3,7 @@ package fuck.andes.agent.runtime
 import android.content.Context
 import fuck.andes.agent.model.AgentConversationCodec
 import fuck.andes.agent.model.AgentModelClient
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.db.RuntimeArchiveEventEntity
 import fuck.andes.data.db.RuntimeArchiveRunEntity
 import fuck.andes.data.db.RuntimeArchiveRunWithEvents
@@ -36,7 +36,7 @@ internal object AgentRunArchiveStore {
     fun add(context: Context, run: ArchivedRun) {
         val appContext = context.applicationContext
         runBlocking(Dispatchers.IO) {
-            val dao = FuckAndesDatabase.get(appContext).runtimeRunDao()
+            val dao = EtaDatabase.get(appContext).runtimeRunDao()
             val compacted = run.copy(events = compactEvents(run.events))
             val archiveRunId = compacted.archiveRunId
             dao.replaceArchivedRun(
@@ -50,7 +50,7 @@ internal object AgentRunArchiveStore {
     fun list(context: Context): List<ArchivedRun> {
         val appContext = context.applicationContext
         return runBlocking(Dispatchers.IO) {
-            prune(FuckAndesDatabase.get(appContext).runtimeRunDao())
+            prune(EtaDatabase.get(appContext).runtimeRunDao())
                 .mapNotNull { it.toDomain() }
         }
     }
@@ -59,7 +59,7 @@ internal object AgentRunArchiveStore {
         if (runId.isBlank()) return
         val appContext = context.applicationContext
         runBlocking(Dispatchers.IO) {
-            FuckAndesDatabase.get(appContext)
+            EtaDatabase.get(appContext)
                 .runtimeRunDao()
                 .deleteArchivedRun(runId)
         }

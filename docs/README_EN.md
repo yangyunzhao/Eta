@@ -45,14 +45,14 @@ Eta is not a one-shot chat wrapper: the model issues instructions, Eta executes 
 | ---- | -------------- |
 | **Native device tools** | Alarms, timers, media control, volume, Wi-Fi / Bluetooth, device and storage state, plus on-device search across photos, calendar, contacts, SMS, notifications, health summaries, and ColorOS notes and system memory—all structured tools with explicit schemas |
 | **Embedded browser** | Loads JavaScript-heavy pages offscreen, extracts structured content, and operates page elements; when human intervention helps (e.g. a CAPTCHA), the same WebView attaches to the app UI for direct takeover |
-| **Terminal and files** | Authorized `user` / `root` shell commands, file access, and scripts; an optional Alpine Linux environment preloads Git, `rg`, and other common tools, with Python, Node.js, SSH, and APK analysis toolsets installable on demand |
-| **MCP tools** | Connect Streamable HTTP servers and add individually enabled third-party tools to the same Agent Loop; supports HTTP / HTTPS and an optional bearer token, with tool results treated as sensitive data |
+| **Terminal and files** | Authorized `user` / `root` shell commands, file access, and scripts; choose either lightweight Alpine (musl) or broader Debian glibc, install the base environment first, then add tools as needed; China-network installs prefer one measured domestic mirror with an official fallback |
 | **GUI / computer use** | Screenshots, accessibility nodes, tapping, scrolling, and text input, with an overlay and gesture feedback during foreground work that you can interrupt or take over. Covers the long tail of apps with no machine interface |
 
 On top of that:
 
 - **Long-term memory:** cross-conversation memory lives in one on-device `MEMORY.md`, injected on demand per task; Settings exposes usage, full editing, clearing, and an off switch
 - **Skills:** browse and install Skills from public GitHub repositories or import a local ZIP; the model reads them on demand, and installation never executes packaged scripts
+- **MCP tools:** connect remote Streamable HTTP servers and add individually enabled third-party tools to the Agent Loop; supports HTTP / HTTPS and an optional bearer token
 - **Sessions and results:** runs started from external entry points are archived into Eta conversations and recovered after process death; long-press a message to copy, edit, or delete from that turn, and regenerate any final response
 
 ## What you can ask Eta to do
@@ -106,6 +106,7 @@ Gemini unlock and Circle to Search were Eta's original Google enablement feature
 - **Built-in providers:** OpenAI, Anthropic, Alibaba Cloud Model Studio, DeepSeek, Kimi, Xiaomi MiMo, MiniMax, StepFun, SiliconFlow, and OpenRouter
 - **Custom providers:** HTTP/HTTPS base URL, API key, headers, and body JSON; plain HTTP transmits the API key, prompts, and model content without transport encryption
 - **Model management:** bundled official catalogs, remote list sync, custom models, and fuzzy search; context-length and reasoning-effort overrides always win over later remote syncs, and each provider remembers its last selected model
+- **Data backup:** Settings can export or import conversations, model provider configuration, and `MEMORY.md` for package-name changes or device migration; backup files contain provider API keys and should be stored securely
 
 BYOK—Bring Your Own Key—means the agent follows the capabilities of the model and provider you choose instead of being locked to one bundled service.
 
@@ -116,7 +117,7 @@ BYOK—Bring Your Own Key—means the agent follows the capabilities of the mode
 
 1. Install the APK, open Eta, and configure a model provider, API key, and active model.
 2. Grant overlay, accessibility, installed-app visibility, location, notification-access, usage-access, and background-execution permissions as needed; location tasks launched from assistant entry points such as Breeno require “allow all the time”.
-3. Enable native device tools, sensitive reads, sensitive device actions, and terminal/file tools as needed; remote MCP servers can be added under tool settings, where each tool is enabled individually; choose the terminal identity explicitly as `user` or `root`, and install the optional Linux environment for tools such as Git, with the Python toolchain installable on demand inside it.
+3. Enable native device tools, sensitive reads, sensitive device actions, and terminal/file tools as needed; remote MCP servers can be added under **Context & extensions**, where each tool is enabled individually; choose the terminal identity explicitly as `user` or `root`, and install the optional Linux environment for tools such as Git, with the Python toolchain installable on demand inside it.
 4. Enable Eta's accessibility service in Android Settings.
 5. Optional system entry points:
    - Native digital assistant: open **Eta system assistant** on the Settings page and select Eta in Android's system picker
@@ -184,7 +185,7 @@ flowchart LR
 | Perception and context | Screen, voice, notifications, calendar, time and location, habits, memory, and cross-device state | Image input and local-path reading, screen observation, accessibility nodes, time and location, device state, recent notifications, photos, files, calendars, contacts, calls, SMS, ColorOS notes and recordings, QQ and WeChat image caches, conversation history, and on-demand memory |
 | Planning and orchestration | Intent understanding, planning, risk assessment, and model routing | Agentic loop, tool schemas, system constraints, steering, and cancellation |
 | Capability routing | Native system calls; structured third-party APIs, CLIs, MCP, or AppFunctions; GUI coverage for closed apps | Android tools, system and OEM providers, verified local file data, GUI agent, browser, Skills, and terminal tools; no private third-party business APIs |
-| Execution environment | Apps, system services, files, sensors, compute units, and multiple devices | Android `user`/`root` shell, file tools, and Alpine Linux |
+| Execution environment | Apps, system services, files, sensors, compute units, and multiple devices | Android `user`/`root` shell, file tools, and the selected Alpine Linux or Debian glibc environment |
 | Outcome loop | State verification, recovery, risk-based confirmation, and proactive service | Structured tool results, renewed observation, state waits, event streams, result archiving, and user takeover |
 
 For an OEM Agentic OS, the advantage over an ordinary AI app goes beyond a stronger model: it can provide continuous but controlled system context, maintain governable memory, orchestrate capabilities across apps and devices, and turn answers into verified outcomes. That power requires restraint: task-scoped context, transparent data use, visible sensing, explicit sensitive permissions, risk-aware confirmation, interruptible execution, and auditable results.

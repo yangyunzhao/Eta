@@ -9,7 +9,7 @@ internal object AgentTerminalToolCatalog {
             .put(
                 AgentToolSchema.function(
                     name = "terminal",
-                    description = "Manage terminal sessions on the current device. environment=android runs Android system commands and root operations; environment=linux runs the optional Eta Linux tool environment for Python, Git, archives, package management, and optional APK analysis with jadx/apktool/smali/baksmali. Apktool build is unavailable until an ARM64 AAPT2 runtime is installed. Use open_and_exec for one-shot commands. Use open to create a persistent shell session and exec with session_id for multi-step work. Use async=true without session_id for long-running independent commands, then read_async_result with job_id to stream output chunks. Use close to stop jobs or close sessions.",
+                    description = "Manage terminal sessions on the current device. environment=android runs Android system commands and root operations; environment=linux runs the Alpine or Debian environment selected by the user. Apktool build is unavailable until an ARM64 AAPT2 runtime is installed. Use open_and_exec for one-shot commands. Use open to create a persistent shell session and exec with session_id for multi-step work. Use async=true without session_id for long-running independent commands, then read_async_result with job_id to stream output chunks. Use daemon_start for services that must keep running after the Agent run (listening ports, web panels, watchers): the process detaches from any command shell, logs to a file, and survives until daemon_stop or device reboot. Manage daemons with daemon_list, daemon_logs and daemon_stop by task_id. Use close to stop jobs or close sessions.",
                     parameters = JSONObject()
                         .put("type", "object")
                         .put(
@@ -27,8 +27,12 @@ internal object AgentTerminalToolCatalog {
                                                 .put("open_and_exec")
                                                 .put("read_async_result")
                                                 .put("close")
+                                                .put("daemon_start")
+                                                .put("daemon_list")
+                                                .put("daemon_logs")
+                                                .put("daemon_stop")
                                         )
-                                        .put("description", "open creates a session. exec runs command in a session or cwd. open_and_exec runs a one-shot command. read_async_result reads async output by job_id. close closes a session_id or job_id.")
+                                        .put("description", "open creates a session. exec runs command in a session or cwd. open_and_exec runs a one-shot command. read_async_result reads async output by job_id. close closes a session_id or job_id. daemon_start launches a detached long-lived service and returns task_id. daemon_list lists daemon tasks with liveness. daemon_logs tails a task log. daemon_stop terminates and removes a task.")
                                 )
                                 .put(
                                     "identity",
@@ -42,7 +46,7 @@ internal object AgentTerminalToolCatalog {
                                     JSONObject()
                                         .put("type", "string")
                                         .put("enum", JSONArray().put("android").put("linux"))
-                                        .put("description", "android uses the native Android shell with BusyBox applets when available. linux uses the separately installed Alpine tool environment. Default android.")
+                                        .put("description", "android uses the native Android shell with BusyBox applets when available. linux uses the Alpine or Debian environment selected in Eta settings. Default android.")
                                 )
                                 .put(
                                     "command",
@@ -54,7 +58,7 @@ internal object AgentTerminalToolCatalog {
                                     "cwd",
                                     JSONObject()
                                         .put("type", "string")
-                                        .put("description", "Working directory. Defaults to /data/local/tmp/fuck_andes for android and /workspace for linux. Relative paths use the environment default. ~/ means /storage/emulated/0.")
+                                        .put("description", "Working directory. Defaults to /data/local/tmp/eta for android and /workspace for linux. Relative paths use the environment default. ~/ means /storage/emulated/0.")
                                 )
                                 .put(
                                     "timeout_ms",
@@ -79,6 +83,12 @@ internal object AgentTerminalToolCatalog {
                                     JSONObject()
                                         .put("type", "string")
                                         .put("description", "Async job id returned when async=true. Use with read_async_result or close.")
+                                )
+                                .put(
+                                    "task_id",
+                                    JSONObject()
+                                        .put("type", "string")
+                                        .put("description", "Daemon task id returned by daemon_start. Use with daemon_logs or daemon_stop.")
                                 )
                                 .put(
                                     "async",
@@ -127,7 +137,7 @@ internal object AgentTerminalToolCatalog {
                                     "cwd",
                                     JSONObject()
                                         .put("type", "string")
-                                        .put("description", "工作目录，默认 /data/local/tmp/fuck_andes。相对路径也按该目录解析；用户存储可用 ~/ 表示 /storage/emulated/0。")
+                                        .put("description", "工作目录，默认 /data/local/tmp/eta。相对路径也按该目录解析；用户存储可用 ~/ 表示 /storage/emulated/0。")
                                 )
                                 .put(
                                     "timeout_seconds",
@@ -189,7 +199,7 @@ internal object AgentTerminalToolCatalog {
             .put(
                 AgentToolSchema.function(
                     name = "list_directory",
-                    description = "列出 Android 目录内容。默认 /data/local/tmp/fuck_andes，输出类似 ls -l。",
+                    description = "列出 Android 目录内容。默认 /data/local/tmp/eta，输出类似 ls -l。",
                     parameters = JSONObject()
                         .put("type", "object")
                         .put(

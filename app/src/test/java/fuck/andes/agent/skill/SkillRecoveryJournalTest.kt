@@ -1,6 +1,6 @@
 package fuck.andes.agent.skill
 
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.db.SkillRegistryEntity
 import java.io.File
 import java.io.IOException
@@ -27,7 +27,7 @@ class SkillRecoveryJournalTest {
 
     @Before
     fun setUp() {
-        FuckAndesDatabase.closeForTests()
+        EtaDatabase.closeForTests()
         RuntimeEnvironment.getApplication().deleteDatabase("fuck_andes.db")
     }
 
@@ -301,7 +301,7 @@ class SkillRecoveryJournalTest {
 
     private fun upsertRegistry(skillId: String, enabled: Boolean) {
         runBlocking {
-            FuckAndesDatabase.get(RuntimeEnvironment.getApplication())
+            EtaDatabase.get(RuntimeEnvironment.getApplication())
                 .skillDao()
                 .upsertRegistryEntry(
                     SkillRegistryEntity(
@@ -316,14 +316,14 @@ class SkillRecoveryJournalTest {
 
     private fun deleteRegistry(skillId: String) {
         runBlocking {
-            FuckAndesDatabase.get(RuntimeEnvironment.getApplication())
+            EtaDatabase.get(RuntimeEnvironment.getApplication())
                 .skillDao()
                 .deleteRegistryEntry(skillId)
         }
     }
 
     private fun registryEntry(skillId: String): SkillRegistryEntity? = runBlocking {
-        FuckAndesDatabase.get(RuntimeEnvironment.getApplication())
+        EtaDatabase.get(RuntimeEnvironment.getApplication())
             .skillDao()
             .registryEntries()
             .firstOrNull { it.skillId == skillId }

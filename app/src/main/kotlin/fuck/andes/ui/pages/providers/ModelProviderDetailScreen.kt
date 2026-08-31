@@ -38,7 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.data.auth.CodexLoginState
 import fuck.andes.data.model.AnthropicProviderSetting
 import fuck.andes.data.model.CustomProviderSetting
@@ -143,7 +143,7 @@ internal fun ModelProviderDetailScreen(
     }
 
     LaunchedEffect(Unit) {
-        RuntimeConfigRepository.ensureDefaults(FuckAndesApp.serviceInstance)
+        RuntimeConfigRepository.ensureDefaults(EtaApp.serviceInstance)
     }
 
     if (provider == null && draft == null) {
@@ -239,7 +239,7 @@ private fun ProviderConfigTab(
     var creationCommitted by remember { mutableStateOf(false) }
     val canUseCodexOAuth = supportsCodexOAuth(provider)
     val codexMode = canUseCodexOAuth && draft.authMode == ProviderAuthModes.CODEX_OAUTH
-    val codexManager = if (canUseCodexOAuth) FuckAndesApp.requireCodexOAuthManager() else null
+    val codexManager = if (canUseCodexOAuth) EtaApp.requireCodexOAuthManager() else null
     val codexLoginState = codexManager
         ?.loginStateFlowFor(provider.id)
         ?.collectAsState()
@@ -461,7 +461,7 @@ private fun ProviderConfigTab(
                                         RuntimeConfigRepository.setSelectedProviderId(added.id)
                                     }
                                     val ok = RuntimeConfigRepository.syncToRemotePreferences(
-                                        FuckAndesApp.serviceInstance
+                                        EtaApp.serviceInstance
                                     )
                                     status = if (ok) context.getString(R.string.page_created_set_current_and_synced_a99010)
                                     else context.getString(R.string.page_created_and_set_as_current_lsposed_service_is_not_co_baa03d)
@@ -473,7 +473,7 @@ private fun ProviderConfigTab(
                                         RuntimeConfigRepository.setSelectedProviderId(built.id)
                                     }
                                     val ok = RuntimeConfigRepository.syncToRemotePreferences(
-                                        FuckAndesApp.serviceInstance
+                                        EtaApp.serviceInstance
                                     )
                                     status = when {
                                         !built.isEnabled -> context.getString(R.string.page_saved_provider_not_enabled_7afa54)
@@ -562,7 +562,7 @@ private fun ProviderConfigTab(
                         isWorking = true
                         try {
                             ProviderRepository.deleteProvider(provider.id)
-                            RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                            RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                             showDeleteDialog = false
                             onDeleted()
                         } catch (cancelled: CancellationException) {
@@ -599,7 +599,7 @@ private fun ProviderConfigTab(
                         isWorking = true
                         try {
                             ProviderRepository.resetBuiltIn(provider.id)
-                            RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                            RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                             status = context.getString(R.string.page_reset_a0cc65)
                             showResetDialog = false
                         } catch (cancelled: CancellationException) {

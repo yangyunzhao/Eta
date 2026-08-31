@@ -36,7 +36,7 @@ import kotlinx.coroutines.runBlocking
  *
  * UI 侧通过 [XposedService] 写入 RemotePreferences。
  */
-class FuckAndesApp : Application(), XposedServiceHelper.OnServiceListener {
+class EtaApp : Application(), XposedServiceHelper.OnServiceListener {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -71,7 +71,7 @@ class FuckAndesApp : Application(), XposedServiceHelper.OnServiceListener {
         XposedServiceHelper.registerListener(this)
         applicationScope.launch {
             runCatching {
-                SkillRuntime.createIndexService(this@FuckAndesApp).listInstalledSkills()
+                SkillRuntime.createIndexService(this@EtaApp).listInstalledSkills()
             }.onFailure { throwable ->
                 AndroidAgentLogger.warn(
                     "Agent skill index prewarm failed: type=${throwable.safeLogType()}"

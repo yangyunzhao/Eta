@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class FuckAndesDatabaseMigrationTest {
+class EtaDatabaseMigrationTest {
     @Test
     fun migration6To19PreservesDataAndMovesBoundedConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
@@ -28,7 +28,7 @@ class FuckAndesDatabaseMigrationTest {
         createVersion6Database(context, databaseName)
 
         val migration17To18WithMcpData = Migration(17, 18) { database ->
-            FuckAndesDatabase.MIGRATION_17_18.migrate(database)
+            EtaDatabase.MIGRATION_17_18.migrate(database)
             database.execSQL(
                 "INSERT INTO mcp_servers (id, name, url, enabled, protocol_mode, " +
                     "authorization_type, tools_json, enabled_tool_names_json, created_at, " +
@@ -38,21 +38,21 @@ class FuckAndesDatabaseMigrationTest {
             )
         }
 
-        val database = Room.databaseBuilder(context, FuckAndesDatabase::class.java, databaseName)
+        val database = Room.databaseBuilder(context, EtaDatabase::class.java, databaseName)
             .addMigrations(
-                FuckAndesDatabase.MIGRATION_6_7,
-                FuckAndesDatabase.MIGRATION_7_8,
-                FuckAndesDatabase.MIGRATION_8_9,
-                FuckAndesDatabase.MIGRATION_9_10,
-                FuckAndesDatabase.MIGRATION_10_11,
-                FuckAndesDatabase.MIGRATION_11_12,
-                FuckAndesDatabase.MIGRATION_12_13,
-                FuckAndesDatabase.MIGRATION_13_14,
-                FuckAndesDatabase.MIGRATION_14_15,
-                FuckAndesDatabase.MIGRATION_15_16,
-                FuckAndesDatabase.MIGRATION_16_17,
+                EtaDatabase.MIGRATION_6_7,
+                EtaDatabase.MIGRATION_7_8,
+                EtaDatabase.MIGRATION_8_9,
+                EtaDatabase.MIGRATION_9_10,
+                EtaDatabase.MIGRATION_10_11,
+                EtaDatabase.MIGRATION_11_12,
+                EtaDatabase.MIGRATION_12_13,
+                EtaDatabase.MIGRATION_13_14,
+                EtaDatabase.MIGRATION_14_15,
+                EtaDatabase.MIGRATION_15_16,
+                EtaDatabase.MIGRATION_16_17,
                 migration17To18WithMcpData,
-                FuckAndesDatabase.MIGRATION_18_19,
+                EtaDatabase.MIGRATION_18_19,
             )
             .build()
         try {
@@ -156,7 +156,7 @@ class FuckAndesDatabaseMigrationTest {
         )
         try {
             val database = helper.writableDatabase
-            FuckAndesDatabase.MIGRATION_15_16.migrate(database)
+            EtaDatabase.MIGRATION_15_16.migrate(database)
 
             assertEquals("codex_oauth", queryString(database, "SELECT auth_mode FROM model_providers"))
             assertNull(queryString(database, "SELECT context_window_override FROM provider_models"))
@@ -178,7 +178,7 @@ class FuckAndesDatabaseMigrationTest {
         )
         try {
             val database = helper.writableDatabase
-            FuckAndesDatabase.MIGRATION_15_16.migrate(database)
+            EtaDatabase.MIGRATION_15_16.migrate(database)
 
             assertEquals("", queryString(database, "SELECT auth_mode FROM model_providers"))
             assertEquals("262144", queryString(database, "SELECT context_window_override FROM provider_models"))
@@ -199,8 +199,8 @@ class FuckAndesDatabaseMigrationTest {
         val helper = createVersion16Database(context, databaseName)
         try {
             val database = helper.writableDatabase
-            FuckAndesDatabase.MIGRATION_16_17.migrate(database)
-            FuckAndesDatabase.MIGRATION_17_18.migrate(database)
+            EtaDatabase.MIGRATION_16_17.migrate(database)
+            EtaDatabase.MIGRATION_17_18.migrate(database)
             database.execSQL(
                 "INSERT INTO mcp_servers (id, name, url, enabled, protocol_mode, " +
                     "authorization_type, tools_json, enabled_tool_names_json, created_at, " +
@@ -208,7 +208,7 @@ class FuckAndesDatabaseMigrationTest {
                     "('mcp-1', 'MCP', 'http://127.0.0.1:8787/mcp', 1, 'auto', 'none', " +
                     "'[]', '[]', 1, 0, NULL, NULL)",
             )
-            FuckAndesDatabase.MIGRATION_18_19.migrate(database)
+            EtaDatabase.MIGRATION_18_19.migrate(database)
 
             assertEquals("codex_oauth", queryString(database, "SELECT auth_mode FROM model_providers"))
             assertEquals("1", queryString(
@@ -230,7 +230,7 @@ class FuckAndesDatabaseMigrationTest {
         val helper = createVersion18Database(context, databaseName)
         try {
             val database = helper.writableDatabase
-            FuckAndesDatabase.MIGRATION_18_19.migrate(database)
+            EtaDatabase.MIGRATION_18_19.migrate(database)
 
             assertEquals("", queryString(database, "SELECT auth_mode FROM model_providers"))
             assertEquals("1234", queryString(

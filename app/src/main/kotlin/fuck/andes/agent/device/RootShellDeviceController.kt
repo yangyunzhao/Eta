@@ -586,7 +586,7 @@ internal class RootShellDeviceController(
         val serviceResult = AgentAccessibilityService.current()?.copyToClipboard(text)
         val ok = serviceResult?.ok ?: runCatching {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("fuck_andes_agent", text))
+            clipboard.setPrimaryClip(ClipData.newPlainText("eta_agent", text))
             true
         }.getOrDefault(false)
         val json = JSONObject()
@@ -795,8 +795,8 @@ internal class RootShellDeviceController(
 
     private fun dumpUiNodes(maxNodes: Int): List<UiNode> {
         val result = runSuText(
-            "uiautomator dump --compressed /data/local/tmp/fuck_andes_window.xml >/dev/null && " +
-                "cat /data/local/tmp/fuck_andes_window.xml && rm -f /data/local/tmp/fuck_andes_window.xml",
+            "uiautomator dump --compressed /data/local/tmp/eta_window.xml >/dev/null && " +
+                "cat /data/local/tmp/eta_window.xml && rm -f /data/local/tmp/eta_window.xml",
             timeoutSeconds = 10
         )
         if (result.exitCode != 0 || result.output.isBlank()) {

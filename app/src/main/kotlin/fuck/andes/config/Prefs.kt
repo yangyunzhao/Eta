@@ -20,7 +20,7 @@ import io.github.libxposed.service.XposedService
 internal object Prefs {
 
     /** 远程配置组名，UI 写入与 Hook 读取必须一致。 */
-    const val GROUP = "fuck_andes_prefs"
+    const val GROUP = "eta_prefs"
 
     private const val LOCAL_AGENT_GROUP = "eta_agent_preferences"
 

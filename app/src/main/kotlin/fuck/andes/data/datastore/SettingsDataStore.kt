@@ -23,11 +23,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 internal object SettingsDataStore {
-    private const val STORE_NAME = "fuck_andes_settings"
+    private const val STORE_NAME = "eta_settings"
 
     private val SELECTED_PROVIDER_ID = stringPreferencesKey("selected_provider_id")
     private val SELECTED_MODEL_ID = stringPreferencesKey("selected_model_id")
     private val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
+    private val LINUX_DISTRIBUTION = stringPreferencesKey("linux_distribution")
     private val APPEARANCE_THEME_MODE = stringPreferencesKey("appearance_theme_mode")
     private val APPEARANCE_MONET_ENABLED = booleanPreferencesKey("appearance_monet_enabled")
     private val APPEARANCE_PALETTE_STYLE = stringPreferencesKey("appearance_palette_style")
@@ -103,6 +104,15 @@ internal object SettingsDataStore {
     fun memoryEnabledFlow(): Flow<Boolean> =
         settingsFlow().map { it.memoryEnabled }
 
+    fun linuxDistributionFlow(): Flow<String?> {
+        ensureInitialized()
+        return dataStore.data
+            .catch { cause ->
+                if (cause is IOException) emit(emptyPreferences()) else throw cause
+            }
+            .map { preferences -> preferences[LINUX_DISTRIBUTION] }
+    }
+
     fun appearanceSettingsFlow(): Flow<AppearanceSettings> =
         settingsFlow().map { it.appearance }
 
@@ -140,6 +150,11 @@ internal object SettingsDataStore {
 
     suspend fun setMemoryEnabled(enabled: Boolean) {
         updateSettings { it.copy(memoryEnabled = enabled) }
+    }
+
+    suspend fun setLinuxDistribution(value: String?) {
+        ensureInitialized()
+        dataStore.edit { preferences -> preferences.putOrRemove(LINUX_DISTRIBUTION, value) }
     }
 
     suspend fun setAppearanceSettings(settings: AppearanceSettings) {

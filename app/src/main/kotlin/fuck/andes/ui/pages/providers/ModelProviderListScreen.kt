@@ -26,7 +26,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.ProviderSourceTypes
 import fuck.andes.data.model.typeLabel
@@ -57,7 +57,7 @@ internal fun ModelProviderListScreen(
     var providerToDelete by remember { mutableStateOf<ProviderSetting?>(null) }
 
     LaunchedEffect(Unit) {
-        RuntimeConfigRepository.ensureDefaults(FuckAndesApp.serviceInstance)
+        RuntimeConfigRepository.ensureDefaults(EtaApp.serviceInstance)
     }
 
     val filteredProviders = remember(providers, searchQuery) {
@@ -142,7 +142,7 @@ internal fun ModelProviderListScreen(
                             onSelect = {
                                 scope.launch {
                                     RuntimeConfigRepository.setSelectedProviderId(provider.id)
-                                    RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                                    RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                                 }
                             },
                         )
@@ -167,7 +167,7 @@ internal fun ModelProviderListScreen(
                     scope.launch {
                         providerToDelete?.let { provider ->
                             ProviderRepository.deleteProvider(provider.id)
-                            RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                            RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                         }
                         providerToDelete = null
                     }

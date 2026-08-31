@@ -88,7 +88,7 @@ internal object BreenoHooks {
     private const val EXPERIMENTAL_ADB_PREFIX = "/agent%20"
     private const val BREENO_HANDOFF_SOURCE = "breeno"
     private const val BREENO_DEFAULT_AGENT_NAME = "default"
-    private const val INJECTED_MARKER_KEY = "fuckAndesAgent"
+    private const val INJECTED_MARKER_KEY = "etaAgent"
     private const val AI_CHAT_TYPE_QUERY = 1
     private const val AI_CHAT_TYPE_ANSWER = 2
     private const val AGENT_REQUEST_DEDUP_WINDOW_MS = 12_000L

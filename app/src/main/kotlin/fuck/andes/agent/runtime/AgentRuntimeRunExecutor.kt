@@ -1,7 +1,7 @@
 package fuck.andes.agent.runtime
 
 import android.content.Context
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.agent.accessibility.AgentAccessibilityKeeper
 import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.agent.model.AgentModelExecutionException
@@ -192,7 +192,7 @@ internal class AgentRuntimeRunExecutor(
                 codexCredentialProvider = if (
                     CodexOAuthFeaturePolicy.shouldResolveCredential(request.config.authMode)
                 ) {
-                    FuckAndesApp.requireCodexCredentialProvider()
+                    EtaApp.requireCodexCredentialProvider()
                 } else {
                     null
                 },

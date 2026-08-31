@@ -8,7 +8,7 @@ import fuck.andes.data.db.ConversationEntity
 import fuck.andes.data.db.ConversationMetadata
 import fuck.andes.data.db.ConversationMessageEntity
 import fuck.andes.data.db.ConversationStateEntity
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.ui.model.AgentChatHomeUiState
 import fuck.andes.ui.model.AgentChatMessageUi
@@ -91,7 +91,7 @@ internal object AgentConversationStore {
                         historyJson = AgentConversationCodec.encodeConversationCheckpoint(state.history),
                     )
                 }
-                FuckAndesDatabase.get(appContext)
+                EtaDatabase.get(appContext)
                     .conversationDao()
                     .replaceAll(
                         conversations = conversations,
@@ -104,7 +104,7 @@ internal object AgentConversationStore {
     }
 
     private suspend fun loadSnapshot(context: Context): Snapshot {
-        val dao = FuckAndesDatabase.get(context).conversationDao()
+        val dao = EtaDatabase.get(context).conversationDao()
         val conversations = dao.conversations()
         if (conversations.isEmpty()) {
             return Snapshot(

@@ -53,7 +53,7 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.composables.icons.lucide.R as LucideR
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.data.model.Model
 import fuck.andes.data.model.ModelReasoningCapabilities
 import fuck.andes.data.model.ProviderAuthModes
@@ -216,7 +216,7 @@ internal fun ProviderModelsTab(
                                         supportsCodexOAuth(provider) &&
                                         provider.authMode == ProviderAuthModes.CODEX_OAUTH
                                     ) {
-                                        FuckAndesApp.requireCodexCredentialProvider()
+                                        EtaApp.requireCodexCredentialProvider()
                                     } else {
                                         null
                                     }
@@ -232,7 +232,7 @@ internal fun ProviderModelsTab(
                                     val chatModels = models.filter(RemoteModelFetcher::isChatCapableModel)
                                     val sync = ModelRepository.syncRemoteModels(provider.id, chatModels)
                                     if (sync.applied) {
-                                        RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                                        RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                                     }
                                     val filteredCount = models.size - chatModels.size
                                     message = if (!sync.applied) {
@@ -380,7 +380,7 @@ internal fun ProviderModelsTab(
                             onSetCurrent = {
                                 scope.launch {
                                     RuntimeConfigRepository.setSelectedModelId(model.id)
-                                    RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                                    RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                                 }
                             },
                         )
@@ -443,7 +443,7 @@ internal fun ProviderModelsTab(
                     editorError = null
                     try {
                         val saved = ModelRepository.saveModel(provider.id, updated)
-                        RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                        RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                         editingModel = null
                         message = context.getString(R.string.provider_model_saved, saved.displayName)
                     } catch (cancelled: CancellationException) {
@@ -482,7 +482,7 @@ internal fun ProviderModelsTab(
                         isMutatingModel = true
                         try {
                             ModelRepository.deleteModel(provider.id, model.id)
-                            RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                            RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                             message = context.getString(R.string.provider_model_deleted, model.displayName)
                             modelPendingDelete = null
                         } catch (cancelled: CancellationException) {
@@ -525,7 +525,7 @@ internal fun ProviderModelsTab(
                         isMutatingModel = true
                         try {
                             ModelRepository.deleteModels(provider.id, selectedModelIds)
-                            RuntimeConfigRepository.syncToRemotePreferences(FuckAndesApp.serviceInstance)
+                            RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
                             message = context.resources.getQuantityString(
                                 R.plurals.provider_models_deleted,
                                 deletedCount,

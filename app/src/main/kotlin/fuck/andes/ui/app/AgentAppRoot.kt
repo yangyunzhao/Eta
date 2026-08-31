@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.R
 import fuck.andes.agent.device.BoundedRootCommandExecutor
 import fuck.andes.agent.device.DeviceLocationProvider
@@ -65,6 +66,7 @@ import fuck.andes.ui.navigation.AgentNavigator
 import fuck.andes.ui.navigation.AppRoute
 import fuck.andes.ui.screens.chat.AgentChatScreen
 import fuck.andes.ui.screens.browser.AgentBrowserScreen
+import fuck.andes.ui.screens.backup.DataBackupScreen
 import fuck.andes.ui.screens.enhance.SystemEnhanceScreen
 import fuck.andes.ui.screens.home.AgentHomeScreen
 import fuck.andes.ui.screens.memory.AgentMemoryScreen
@@ -73,6 +75,9 @@ import fuck.andes.ui.screens.mcp.McpServersScreen
 import fuck.andes.ui.screens.permissions.PermissionHealthScreen
 import fuck.andes.ui.screens.skills.AgentSkillsScreen
 import fuck.andes.ui.screens.terminal.LinuxEnvironmentScreen
+import fuck.andes.ui.screens.terminal.LinuxFilesScreen
+import fuck.andes.ui.screens.terminal.SharedFoldersScreen
+import fuck.andes.ui.screens.terminal.TerminalEntryScreen
 import fuck.andes.ui.screens.tools.AgentToolsScreen
 
 /**
@@ -87,7 +92,8 @@ fun AgentAppRoot(
     val uiScope = rememberCoroutineScope()
     val backStack = rememberNavBackStack<AppRoute>(AppRoute.Home)
     val navigator = remember(backStack) { AgentNavigator(backStack) }
-    val agentState = viewModel<AgentAppViewModel>().state
+    val appViewModel = viewModel<AgentAppViewModel>()
+    val agentState = appViewModel.state
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -113,7 +119,7 @@ fun AgentAppRoot(
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(Unit) {
-        RuntimeConfigRepository.ensureDefaults(FuckAndesApp.serviceInstance)
+        RuntimeConfigRepository.ensureDefaults(EtaApp.serviceInstance)
     }
 
     LaunchedEffect(assistantConversationKey) {
@@ -166,6 +172,27 @@ fun AgentAppRoot(
             onDismissConversationPane = { conversationPaneOpen = false },
             onSearchConversations = { query -> agentState.updateSearchQuery(query) },
             onNewConversation = { createConversation() },
+            onOpenTerminal = { pushRoute(AppRoute.Terminal) },
+            onLaunchKimiWeb = {
+                if (appViewModel.kimiWebReady()) {
+                    appViewModel.launchKimiWeb { result ->
+                        if (result is KimiWebLaunchResult.Failed) {
+                            Toast.makeText(
+                                context,
+                                when (result.code) {
+                                    "START_FAILED" -> R.string.linux_kimi_web_failed_start
+                                    "URL_TIMEOUT" -> R.string.linux_kimi_web_failed_url
+                                    else -> R.string.linux_kimi_web_failed_browser
+                                },
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                } else {
+                    pushRoute(AppRoute.LinuxEnvironment)
+                }
+            },
+            onOpenBrowser = { pushRoute(AppRoute.Browser) },
             onSelectConversation = { conversationId -> selectConversation(conversationId) },
             onConversationRename = { conversation ->
                 conversationRenameTarget = conversation
@@ -297,6 +324,15 @@ fun AgentAppRoot(
             entry<AppRoute.Browser>(swipeDismiss = swipeDismiss) {
                 RoutedShell(route = AppRoute.Browser) {
                     AgentBrowserScreen()
+                }
+            }
+            entry<AppRoute.Terminal>(swipeDismiss = swipeDismiss) {
+                RoutedShell(route = AppRoute.Terminal) {
+                    TerminalEntryScreen(
+                        terminalStore = appViewModel.terminalStore,
+                        consoleStore = appViewModel.consoleStore,
+                        onOpenEnvironment = { pushRoute(AppRoute.LinuxEnvironment) },
+                    )
                 }
             }
             entry<AppRoute.Tools>(swipeDismiss = swipeDismiss) {
@@ -463,6 +499,14 @@ fun AgentAppRoot(
             entry<AppRoute.AppearanceSettings>(swipeDismiss = swipeDismiss) {
                 AppearanceSettingsScreen(onBack = ::popRoute)
             }
+            entry<AppRoute.DataBackup>(swipeDismiss = swipeDismiss) {
+                DataBackupScreen(
+                    context = context,
+                    onBack = ::popRoute,
+                    onExport = agentState::exportBackup,
+                    onImport = agentState::importBackup,
+                )
+            }
             entry<AppRoute.Memory>(swipeDismiss = swipeDismiss) {
                 LaunchedEffect(Unit) {
                     agentState.refreshMemory()
@@ -484,6 +528,20 @@ fun AgentAppRoot(
             entry<AppRoute.LinuxEnvironment>(swipeDismiss = swipeDismiss) {
                 LinuxEnvironmentScreen(
                     context = context,
+                    onNavigate = { route -> pushRoute(route) },
+                    onBack = ::popRoute,
+                )
+            }
+            entry<AppRoute.SharedFolders>(swipeDismiss = swipeDismiss) {
+                SharedFoldersScreen(
+                    context = context,
+                    onBack = ::popRoute,
+                )
+            }
+            entry<AppRoute.LinuxFiles>(swipeDismiss = swipeDismiss) { route ->
+                LinuxFilesScreen(
+                    context = context,
+                    distribution = route.distribution,
                     onBack = ::popRoute,
                 )
             }

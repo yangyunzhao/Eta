@@ -6,7 +6,7 @@ import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.data.db.ConversationEntity
 import fuck.andes.data.db.ConversationMessageEntity
 import fuck.andes.data.db.ConversationStateEntity
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.ui.model.AgentChatHomeUiState
 import fuck.andes.ui.model.AgentMessageUi
@@ -40,7 +40,7 @@ class AgentConversationStoreTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
-        FuckAndesDatabase.closeForTests()
+        EtaDatabase.closeForTests()
         context.deleteDatabase("fuck_andes.db")
     }
 
@@ -169,7 +169,7 @@ class AgentConversationStoreTest {
     @Test
     fun unknownStoredEffortFallsBackToDefault() {
         runBlocking {
-            FuckAndesDatabase.get(context).conversationDao().replaceAll(
+            EtaDatabase.get(context).conversationDao().replaceAll(
                 conversations = listOf(
                     ConversationEntity(
                         id = "conv-unknown",
@@ -289,7 +289,7 @@ class AgentConversationStoreTest {
         }
 
         val checkpoint = runBlocking {
-            FuckAndesDatabase.get(context)
+            EtaDatabase.get(context)
                 .conversationDao()
                 .contextCheckpoint("conv-large")!!
         }
@@ -309,7 +309,7 @@ class AgentConversationStoreTest {
     @Test
     fun loadIgnoresLegacyHistoryColumnAndFallsBackToMessageRows() {
         runBlocking {
-            val dao = FuckAndesDatabase.get(context).conversationDao()
+            val dao = EtaDatabase.get(context).conversationDao()
             dao.insertConversations(
                 listOf(
                     ConversationEntity(
@@ -368,7 +368,7 @@ class AgentConversationStoreTest {
             assertTrue(state.conversationPaneState.conversations.isEmpty())
             assertTrue(
                 runBlocking {
-                    FuckAndesDatabase.get(context).conversationDao().conversations().isEmpty()
+                    EtaDatabase.get(context).conversationDao().conversations().isEmpty()
                 }
             )
         } finally {

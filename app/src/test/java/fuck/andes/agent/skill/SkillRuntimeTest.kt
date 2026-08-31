@@ -1,6 +1,6 @@
 package fuck.andes.agent.skill
 
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -26,7 +26,7 @@ class SkillRuntimeTest {
 
     @Before
     fun setUp() {
-        FuckAndesDatabase.closeForTests()
+        EtaDatabase.closeForTests()
         RuntimeEnvironment.getApplication().deleteDatabase("fuck_andes.db")
     }
 

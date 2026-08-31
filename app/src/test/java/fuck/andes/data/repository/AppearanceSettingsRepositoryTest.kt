@@ -1,6 +1,6 @@
 package fuck.andes.data.repository
 
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.data.datastore.SettingsDataStore
 import fuck.andes.data.model.AppearanceAccentColor
 import fuck.andes.data.model.AppearanceSettings
@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(application = FuckAndesApp::class, sdk = [36])
+@Config(application = EtaApp::class, sdk = [36])
 class AppearanceSettingsRepositoryTest {
     @Test
     fun appearanceRoundTripPreservesExistingSettingsFields() = runBlocking {

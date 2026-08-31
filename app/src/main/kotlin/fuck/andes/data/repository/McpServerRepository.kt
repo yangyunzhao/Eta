@@ -1,7 +1,7 @@
 package fuck.andes.data.repository
 
 import android.content.Context
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.db.toDomain
 import fuck.andes.data.db.toEntity
 import fuck.andes.data.model.McpAuthorizationType
@@ -101,7 +101,7 @@ internal object McpServerRepository {
         }
     }
 
-    private fun dao() = FuckAndesDatabase.get(context()).mcpServerDao()
+    private fun dao() = EtaDatabase.get(context()).mcpServerDao()
 
     private fun secrets() = McpSecretStore(context())
 

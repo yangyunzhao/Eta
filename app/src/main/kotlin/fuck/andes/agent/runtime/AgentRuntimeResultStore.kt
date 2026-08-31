@@ -3,7 +3,7 @@ package fuck.andes.agent.runtime
 import android.content.Context
 import fuck.andes.agent.model.AgentConversationCodec
 import fuck.andes.agent.model.AgentModelClient
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.db.RuntimeResultEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -32,7 +32,7 @@ internal object AgentRuntimeResultStore {
             pruneAcknowledgements(System.currentTimeMillis())
             if (recentlyAcknowledgedRunIds.containsKey(entity.runId)) return false
             runBlocking(Dispatchers.IO) {
-                val dao = FuckAndesDatabase.get(appContext).runtimeRunDao()
+                val dao = EtaDatabase.get(appContext).runtimeRunDao()
                 dao.upsertRuntimeResult(entity)
                 prune(dao)
             }
@@ -44,7 +44,7 @@ internal object AgentRuntimeResultStore {
         val appContext = context.applicationContext
         return synchronized(deliveryLock) {
             runBlocking(Dispatchers.IO) {
-                prune(FuckAndesDatabase.get(appContext).runtimeRunDao())
+                prune(EtaDatabase.get(appContext).runtimeRunDao())
                     .map { it.toDomain() }
             }
         }
@@ -55,7 +55,7 @@ internal object AgentRuntimeResultStore {
         val appContext = context.applicationContext
         synchronized(deliveryLock) {
             runBlocking(Dispatchers.IO) {
-                FuckAndesDatabase.get(appContext)
+                EtaDatabase.get(appContext)
                     .runtimeRunDao()
                     .acknowledgeRuntimeResult(runId)
             }

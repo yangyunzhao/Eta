@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.agent.accessibility.AccessibilityProtectionClient
 import fuck.andes.agent.accessibility.AgentAccessibilityService
 import fuck.andes.agent.voice.EtaVoiceInteractionService
@@ -143,7 +143,7 @@ internal fun SettingsScreen(
 
     // prefs 绑定到 XposedService：service 到达时切换到 RemotePreferences（跨进程提交到
     // LSPosed 数据库）；未就绪时保持 null，UI 禁止修改。
-    var prefs by remember { mutableStateOf(Prefs.remotePreferencesForUi(FuckAndesApp.serviceInstance)) }
+    var prefs by remember { mutableStateOf(Prefs.remotePreferencesForUi(EtaApp.serviceInstance)) }
     val agentPrefs = remember { Prefs.localAgentPreferences() }
     var powerAssistantTarget by remember(prefs) {
         mutableStateOf(Prefs.powerAssistantTarget(prefs))
@@ -161,7 +161,7 @@ internal fun SettingsScreen(
         onDispose { targetPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     DisposableEffect(Unit) {
-        val listener = object : FuckAndesApp.ServiceStateListener {
+        val listener = object : EtaApp.ServiceStateListener {
             override fun onServiceStateChanged(service: io.github.libxposed.service.XposedService?) {
                 prefs = Prefs.remotePreferencesForUi(service)
                 Prefs.reconcileAgentPreferences(service)
@@ -170,8 +170,8 @@ internal fun SettingsScreen(
                 }
             }
         }
-        FuckAndesApp.addServiceStateListener(listener, notifyImmediately = true)
-        onDispose { FuckAndesApp.removeServiceStateListener(listener) }
+        EtaApp.addServiceStateListener(listener, notifyImmediately = true)
+        onDispose { EtaApp.removeServiceStateListener(listener) }
     }
     val powerAssistantTargets = PowerAssistantTarget.entries
     val powerAssistantItems = powerAssistantTargets.map { target ->
@@ -494,7 +494,6 @@ internal fun SettingsScreen(
                 Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)) {
                     ArrowPreference(
                         title = stringResource(R.string.appearance_title),
-                        summary = stringResource(R.string.appearance_summary),
                         startAction = {
                             TintedIcon(
                                 icon = LucideR.drawable.lucide_ic_palette,
@@ -502,6 +501,17 @@ internal fun SettingsScreen(
                             )
                         },
                         onClick = { onNavigate(AppRoute.AppearanceSettings) },
+                    )
+                    PrefDivider()
+                    ArrowPreference(
+                        title = stringResource(R.string.data_backup_title),
+                        startAction = {
+                            TintedIcon(
+                                icon = LucideR.drawable.lucide_ic_file_text,
+                                tint = ColorOSVividGreen,
+                            )
+                        },
+                        onClick = { onNavigate(AppRoute.DataBackup) },
                     )
                 }
             }
@@ -785,7 +795,7 @@ private fun SwitchPref(
             if (putBooleanSync(targetPrefs, key, value)) {
                 checked = value
                 if (key in Prefs.Keys.LOCAL_AGENT_KEYS) {
-                    Prefs.reconcileAgentPreferences(FuckAndesApp.serviceInstance)
+                    Prefs.reconcileAgentPreferences(EtaApp.serviceInstance)
                 }
             } else {
                 Toast.makeText(

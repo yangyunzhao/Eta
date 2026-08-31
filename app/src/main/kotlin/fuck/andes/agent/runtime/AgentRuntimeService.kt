@@ -27,7 +27,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import fuck.andes.FuckAndesApp
+import fuck.andes.EtaApp
 import fuck.andes.agent.accessibility.AgentAccessibilityService
 import fuck.andes.agent.media.AgentImageCodec
 import fuck.andes.agent.model.AgentModelClient

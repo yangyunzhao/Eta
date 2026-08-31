@@ -2,7 +2,7 @@ package fuck.andes.agent.skill
 
 import android.content.Context
 import android.content.res.AssetManager
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.db.SkillRegistryEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -60,7 +60,7 @@ private class SkillRegistryStore(
     }
 
     fun readStrict(): LinkedHashMap<String, SkillRegistryEntry> = runBlocking(Dispatchers.IO) {
-        FuckAndesDatabase.get(appContext)
+        EtaDatabase.get(appContext)
             .skillDao()
             .registryEntries()
             .associateTo(linkedMapOf()) { entity ->
@@ -74,7 +74,7 @@ private class SkillRegistryStore(
 
     fun write(entries: Map<String, SkillRegistryEntry>) {
         runBlocking(Dispatchers.IO) {
-            FuckAndesDatabase.get(appContext)
+            EtaDatabase.get(appContext)
                 .skillDao()
                 .replaceRegistry(
                     entries.toSortedMap().map { (skillId, value) ->
@@ -91,7 +91,7 @@ private class SkillRegistryStore(
 
     fun set(skillId: String, entry: SkillRegistryEntry) {
         runBlocking(Dispatchers.IO) {
-            FuckAndesDatabase.get(appContext)
+            EtaDatabase.get(appContext)
                 .skillDao()
                 .upsertRegistryEntry(
                     SkillRegistryEntity(
@@ -106,7 +106,7 @@ private class SkillRegistryStore(
 
     fun remove(skillId: String) {
         runBlocking(Dispatchers.IO) {
-            FuckAndesDatabase.get(appContext)
+            EtaDatabase.get(appContext)
                 .skillDao()
                 .deleteRegistryEntry(skillId)
         }

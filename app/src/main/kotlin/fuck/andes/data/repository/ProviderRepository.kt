@@ -2,7 +2,7 @@ package fuck.andes.data.repository
 
 import android.content.Context
 import fuck.andes.data.datastore.SettingsDataStore
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.db.ProviderWithModelsSeed
 import fuck.andes.data.db.toDomain
 import fuck.andes.data.db.toEntity
@@ -160,7 +160,7 @@ internal object ProviderRepository {
     fun newId(): String = UUID.randomUUID().toString()
 
     private fun dao() =
-        FuckAndesDatabase.get(appContext()).providerDao()
+        EtaDatabase.get(appContext()).providerDao()
 
     private fun appContext(): Context {
         check(::applicationContext.isInitialized) {

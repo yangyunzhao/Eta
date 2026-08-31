@@ -2,7 +2,7 @@ package fuck.andes.data.repository
 
 import android.content.Context
 import fuck.andes.data.datastore.SettingsDataStore
-import fuck.andes.data.db.FuckAndesDatabase
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.model.CustomProviderSetting
 import fuck.andes.data.model.Model
 import fuck.andes.data.model.ModelReasoningCapabilities
@@ -27,7 +27,7 @@ class ModelRepositoryTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
-        FuckAndesDatabase.closeForTests()
+        EtaDatabase.closeForTests()
         context.deleteDatabase("fuck_andes.db")
         SettingsDataStore.init(context)
         ProviderRepository.init(context)

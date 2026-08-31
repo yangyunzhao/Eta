@@ -27,7 +27,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     version = 19,
     exportSchema = false,
 )
-internal abstract class FuckAndesDatabase : RoomDatabase() {
+internal abstract class EtaDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
     abstract fun providerDao(): ProviderDao
     abstract fun runtimeRunDao(): RuntimeRunDao
@@ -36,13 +36,13 @@ internal abstract class FuckAndesDatabase : RoomDatabase() {
 
     companion object {
         @Volatile
-        private var instance: FuckAndesDatabase? = null
+        private var instance: EtaDatabase? = null
 
-        fun get(context: Context): FuckAndesDatabase =
+        fun get(context: Context): EtaDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
-                    FuckAndesDatabase::class.java,
+                    EtaDatabase::class.java,
                     "fuck_andes.db",
                 )
                     .addMigrations(
