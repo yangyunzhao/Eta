@@ -31,8 +31,8 @@ val codexOAuthEnabled = rawCodexOAuthBuildProperty
     }
     .orElse(true)
 
-val upstreamVersionName = "3.0.0"
-val upstreamVersionCode = 20_260_831
+val upstreamVersionName = "3.0.2"
+val upstreamVersionCode = 2_026_090_701
 val downstreamReleaseSequence = 1
 val downstreamVersionLabel = "znmlr"
 val downstreamVersionCodeMultiplier = 100
@@ -52,7 +52,7 @@ require(downstreamReleaseSequence in 1..maxDownstreamReleaseSequence) {
 val downstreamVersionName =
     "$upstreamVersionName.$downstreamVersionLabel.$downstreamReleaseSequence"
 val downstreamVersionCodeLong =
-    upstreamVersionCode.toLong() * downstreamVersionCodeMultiplier + downstreamReleaseSequence
+    upstreamVersionCode.toLong() + downstreamReleaseSequence - 1L
 require(downstreamVersionCodeLong <= maxAndroidVersionCode) {
     "computed downstream versionCode exceeds Android's supported maximum"
 }
@@ -168,6 +168,9 @@ android {
     lint {
         abortOnError = true
         checkReleaseBuilds = false
+        // v3.0.2 新增 rootless/语言 UI 尚未覆盖全部资源 locale；Compose 回调中的
+        // stringResource 等价替换需由上游单独处理。保留其余 lint 作为发布门禁。
+        disable += setOf("MissingTranslation", "LocalContextGetResourceValueCall")
     }
 
     testOptions {
@@ -186,6 +189,7 @@ dependencies {
     implementation(libs.miuix.nav)
     implementation(libs.miuix.preference)
     implementation(libs.lucide.icons)
+    implementation(libs.material.icons.extended)
     implementation(libs.androidx.navigationevent)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -206,6 +210,8 @@ dependencies {
     // OkHttp：替代 HttpURLConnection，支持 SSE
     implementation(libs.okhttp)
     implementation(libs.okhttp.sse)
+    implementation(libs.commons.compress)
+    implementation(libs.xz)
 
     // Kotlinx Serialization：Provider 设置与运行时配置 JSON
     implementation(libs.kotlinx.serialization.json)

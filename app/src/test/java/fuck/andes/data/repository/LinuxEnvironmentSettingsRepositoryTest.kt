@@ -3,6 +3,9 @@ package fuck.andes.data.repository
 import android.content.Context
 import fuck.andes.EtaApp
 import fuck.andes.agent.terminal.LinuxDistribution
+import fuck.andes.agent.terminal.LinuxEnvironmentPaths
+import fuck.andes.agent.terminal.LinuxExecutionBackend
+import java.io.File
 import fuck.andes.data.datastore.SettingsDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -16,6 +19,36 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(application = EtaApp::class, sdk = [36])
 class LinuxEnvironmentSettingsRepositoryTest {
+    @Test
+    fun backendSelectionPersistsWithoutMovingOrDeletingEitherEnvironment() = runBlocking {
+        val context = RuntimeEnvironment.getApplication().applicationContext as Context
+        val distribution = LinuxDistribution.DEBIAN
+        val before = SettingsDataStore.linuxBackendFlow(distribution.wireName).first()
+        val legacy = LinuxEnvironmentPaths.rootfsDir(context, distribution, LinuxExecutionBackend.CHROOT)
+        val ordinary = LinuxEnvironmentPaths.rootfsDir(context, distribution, LinuxExecutionBackend.PROOT)
+        legacy.mkdirs()
+        ordinary.mkdirs()
+        val legacyData = File(legacy, "backend-test-data")
+        val ordinaryData = File(ordinary, "backend-test-data")
+        legacyData.writeText("existing root data")
+        ordinaryData.writeText("ordinary data")
+        try {
+            LinuxEnvironmentSettingsRepository.selectBackend(distribution, LinuxExecutionBackend.PROOT)
+            LinuxEnvironmentSettingsRepository.initialize(context)
+            assertEquals(ordinary, LinuxEnvironmentPaths.rootfsDir(context, distribution))
+            assertEquals("proot", SettingsDataStore.linuxBackendFlow(distribution.wireName).first())
+            LinuxEnvironmentSettingsRepository.selectBackend(distribution, LinuxExecutionBackend.CHROOT)
+            assertEquals(legacy, LinuxEnvironmentPaths.rootfsDir(context, distribution))
+            assertEquals("existing root data", legacyData.readText())
+            assertEquals("ordinary data", ordinaryData.readText())
+        } finally {
+            legacyData.delete()
+            ordinaryData.delete()
+            SettingsDataStore.setLinuxBackend(distribution.wireName, before)
+            LinuxEnvironmentSettingsRepository.initialize(context)
+        }
+    }
+
     @Test
     fun selectionRoundTripsThroughDataStore() = runBlocking {
         val context = RuntimeEnvironment.getApplication().applicationContext as Context

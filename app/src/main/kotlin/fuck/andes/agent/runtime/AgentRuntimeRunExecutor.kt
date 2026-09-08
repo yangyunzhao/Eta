@@ -5,6 +5,7 @@ import fuck.andes.EtaApp
 import fuck.andes.agent.accessibility.AgentAccessibilityKeeper
 import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.agent.model.AgentModelExecutionException
+import fuck.andes.agent.model.AgentModelFailure
 import fuck.andes.agent.model.AgentHttpClient
 import fuck.andes.agent.model.ProviderClientFactory
 import fuck.andes.agent.memory.AgentMemoryContext
@@ -18,13 +19,15 @@ import fuck.andes.agent.skill.SkillContext
 import fuck.andes.agent.skill.SkillRuntime
 import fuck.andes.agent.skill.PublicGitHubSkillSource
 import fuck.andes.agent.tool.AgentLocalTools
+import fuck.andes.agent.tool.AgentToolRequirements
+import fuck.andes.agent.tool.AgentToolCapabilities
 import fuck.andes.agent.tool.PendingSkillConflictCapabilityParser
 import fuck.andes.agent.tool.ToolExecutionDecision
 import fuck.andes.agent.voice.EtaAssistantOverlayService
 import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.core.safeLogType
-import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import fuck.andes.data.repository.AgentMemoryRepository
+import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 
@@ -145,7 +148,7 @@ internal class AgentRuntimeRunExecutor(
                 },
                 beforeToolExecution = { toolName ->
                     val requiresAccessibility =
-                        AgentOverlayVisibilityPolicy.isForegroundOperationTool(toolName)
+                        AgentToolRequirements.requiresAccessibility(toolName)
                     if (
                         !requiresAccessibility &&
                         !AgentOverlayVisibilityPolicy.requiresEntrySurfaceDismissal(toolName)
@@ -199,11 +202,12 @@ internal class AgentRuntimeRunExecutor(
             )
             val completedResponse = AgentModelClient.complete(
                 config = request.config,
+                provider = modelProvider,
+                capabilitiesProvider = { AgentToolCapabilities.capture(appContext) },
                 prompt = request.prompt,
                 toolExecutor = routingExecutor,
                 images = request.images,
                 history = request.history,
-                provider = modelProvider,
                 runController = runController,
                 skillContext = skillContext,
                 memoryContext = memoryContext,
@@ -237,8 +241,11 @@ internal class AgentRuntimeRunExecutor(
             if (cancelled) {
                 AndroidAgentLogger.info("Agent runtime stopped")
             } else {
+                val requestFailure = modelFailure?.cause as? AgentModelFailure
                 AndroidAgentLogger.error(
-                    "Agent runtime failed: type=${throwable.safeLogType()}"
+                    "Agent runtime failed: type=${throwable.safeLogType()}, " +
+                        "model_code=${requestFailure?.code.orEmpty()}, " +
+                        "cause_type=${requestFailure?.cause?.safeLogType().orEmpty()}"
                 )
                 val event = AgentEvent.RunFailed(message)
                 runCatching {
@@ -325,7 +332,9 @@ internal class AgentRuntimeRunExecutor(
         checkpointRecorder?.accept(event)
         if (!session.emit(event)) return
         archivedEvents += event
-        if (event !is AgentEvent.AssistantBlockDelta) {
+        if (event is AgentEvent.ModelRetryScheduled) {
+            AndroidAgentLogger.warn("Agent runtime event: ${event.toLogLine()}")
+        } else if (event !is AgentEvent.AssistantBlockDelta) {
             AndroidAgentLogger.debug { "Agent runtime event: ${event.toLogLine()}" }
         }
         runCatching { onAcceptedEvent(event, entrySurfaceGuard) }

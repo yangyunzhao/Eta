@@ -15,6 +15,8 @@ import fuck.andes.hook.breeno.BreenoHooks
 import fuck.andes.hook.colordirect.ColorDirectHooks
 import fuck.andes.hook.google.GoogleAppHooks
 import fuck.andes.hook.google.GoogleEligibilityHooks
+import fuck.andes.hook.hyperos.HyperOsLauncherHooks
+import fuck.andes.hook.hyperos.HyperOsScreenSearchHooks
 import fuck.andes.hook.system.SystemServerHooks
 import fuck.andes.hook.system.SystemUiHooks
 import fuck.andes.hook.xiaoai.XiaoAiHooks
@@ -53,6 +55,12 @@ class ModuleMain : XposedModule() {
 
     override fun onPackageReady(param: PackageReadyParam) {
         when (param.packageName) {
+            in ModuleConfig.XIAOMI_LAUNCHER_PACKAGES -> {
+                if (param.isFirstPackage && currentProcessName == param.packageName) {
+                    recordInstallation(HyperOsLauncherHooks.install(this, logger, param.classLoader))
+                }
+            }
+
             ModuleConfig.SYSTEM_UI_PACKAGE -> {
                 if (currentProcessName == ModuleConfig.SYSTEM_UI_PACKAGE) {
                     recordInstallation(SystemUiHooks.install(this, logger, param.classLoader))
@@ -92,6 +100,9 @@ class ModuleMain : XposedModule() {
             }
 
             ModuleConfig.XIAOAI_PACKAGE -> {
+                if (isCurrentPackageProcess(ModuleConfig.XIAOAI_PACKAGE)) {
+                    recordInstallation(HyperOsScreenSearchHooks.install(this, logger, param.classLoader))
+                }
                 if (isCurrentXiaoAiProcess()) {
                     recordInstallation(
                         XiaoAiHooks.install(
@@ -118,13 +129,13 @@ class ModuleMain : XposedModule() {
     private fun shouldKeepLifecycleCallbacks(param: ModuleLoadedParam): Boolean {
         if (param.isSystemServer) return true
         val processName = param.processName
-        return processName == ModuleConfig.SYSTEM_UI_PACKAGE ||
+        return processName in ModuleConfig.XIAOMI_LAUNCHER_PACKAGES ||
+            processName == ModuleConfig.SYSTEM_UI_PACKAGE ||
             isPackageProcess(processName, ModuleConfig.GOOGLE_PACKAGE) ||
             isPackageProcess(processName, ModuleConfig.COLOR_DIRECT_PACKAGE) ||
             isPackageProcess(processName, ModuleConfig.BREENO_PACKAGE) ||
             processName == ModuleConfig.COLOROS_MEMORY_PACKAGE ||
-            processName == ModuleConfig.XIAOAI_PACKAGE ||
-            processName == ModuleConfig.XIAOAI_CORE_PROCESS
+            isPackageProcess(processName, ModuleConfig.XIAOAI_PACKAGE)
     }
 
     private fun isCurrentXiaoAiProcess(): Boolean {

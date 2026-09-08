@@ -9,10 +9,10 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -23,12 +23,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -37,13 +38,42 @@ import fuck.andes.EtaApp
 import fuck.andes.R
 import fuck.andes.agent.device.BoundedRootCommandExecutor
 import fuck.andes.agent.device.DeviceLocationProvider
+import fuck.andes.agent.device.RootAccess
 import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.data.repository.RuntimeConfigRepository
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.ui.unit.dp
+import fuck.andes.ui.AppearanceSettingsScreen
+import fuck.andes.ui.SettingsScreen
 import fuck.andes.ui.components.MiuixDialogActions
+import fuck.andes.ui.model.AgentChatAction
+import fuck.andes.ui.model.AgentHomeAction
+import fuck.andes.ui.model.AgentMemoryAction
+import fuck.andes.ui.model.AgentSkillsAction
+import fuck.andes.ui.model.AgentSystemEnhanceAction
+import fuck.andes.ui.model.AgentToolsAction
 import fuck.andes.ui.model.ConversationSummaryUi
+import fuck.andes.ui.model.PermissionHealthAction
+import fuck.andes.ui.navigation.AgentNavigator
+import fuck.andes.ui.navigation.AppRoute
+import fuck.andes.ui.pages.providers.ModelProviderDetailScreen
+import fuck.andes.ui.pages.providers.ModelProviderListScreen
+import fuck.andes.ui.screens.backup.DataBackupScreen
+import fuck.andes.ui.screens.browser.AgentBrowserScreen
+import fuck.andes.ui.screens.chat.AgentChatScreen
+import fuck.andes.ui.screens.enhance.SystemEnhanceScreen
+import fuck.andes.ui.screens.home.AgentHomeScreen
+import fuck.andes.ui.screens.mcp.McpServerDetailScreen
+import fuck.andes.ui.screens.mcp.McpServersScreen
+import fuck.andes.ui.screens.memory.AgentMemoryScreen
+import fuck.andes.ui.screens.permissions.PermissionHealthScreen
+import fuck.andes.ui.screens.skills.AgentSkillsScreen
+import fuck.andes.ui.screens.terminal.LinuxEnvironmentScreen
+import fuck.andes.ui.screens.terminal.LinuxFilesScreen
+import fuck.andes.ui.screens.terminal.SharedFoldersScreen
+import fuck.andes.ui.screens.terminal.TerminalEntryScreen
+import fuck.andes.ui.screens.terminal.WorkspaceScreen
+import fuck.andes.ui.screens.tools.AgentToolsScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
@@ -51,34 +81,6 @@ import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.window.WindowDialog
-import fuck.andes.ui.SettingsScreen
-import fuck.andes.ui.AppearanceSettingsScreen
-import fuck.andes.ui.pages.providers.ModelProviderDetailScreen
-import fuck.andes.ui.pages.providers.ModelProviderListScreen
-import fuck.andes.ui.model.AgentChatAction
-import fuck.andes.ui.model.AgentHomeAction
-import fuck.andes.ui.model.AgentSkillsAction
-import fuck.andes.ui.model.AgentMemoryAction
-import fuck.andes.ui.model.AgentSystemEnhanceAction
-import fuck.andes.ui.model.AgentToolsAction
-import fuck.andes.ui.model.PermissionHealthAction
-import fuck.andes.ui.navigation.AgentNavigator
-import fuck.andes.ui.navigation.AppRoute
-import fuck.andes.ui.screens.chat.AgentChatScreen
-import fuck.andes.ui.screens.browser.AgentBrowserScreen
-import fuck.andes.ui.screens.backup.DataBackupScreen
-import fuck.andes.ui.screens.enhance.SystemEnhanceScreen
-import fuck.andes.ui.screens.home.AgentHomeScreen
-import fuck.andes.ui.screens.memory.AgentMemoryScreen
-import fuck.andes.ui.screens.mcp.McpServerDetailScreen
-import fuck.andes.ui.screens.mcp.McpServersScreen
-import fuck.andes.ui.screens.permissions.PermissionHealthScreen
-import fuck.andes.ui.screens.skills.AgentSkillsScreen
-import fuck.andes.ui.screens.terminal.LinuxEnvironmentScreen
-import fuck.andes.ui.screens.terminal.LinuxFilesScreen
-import fuck.andes.ui.screens.terminal.SharedFoldersScreen
-import fuck.andes.ui.screens.terminal.TerminalEntryScreen
-import fuck.andes.ui.screens.tools.AgentToolsScreen
 
 /**
  * Agent App 根组件：持有本地导航栈，并把 Screen actions 交给 [AgentAppState]。
@@ -94,6 +96,7 @@ fun AgentAppRoot(
     val navigator = remember(backStack) { AgentNavigator(backStack) }
     val appViewModel = viewModel<AgentAppViewModel>()
     val agentState = appViewModel.state
+    val requestExecutionNotifications = rememberExecutionNotificationRequest()
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -103,6 +106,8 @@ fun AgentAppRoot(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                RootAccess.refresh(context)
+                appViewModel.refreshKimiWeb()
                 agentState.refreshPermissionHealth()
                 agentState.refreshRuntimeResults()
             }
@@ -174,16 +179,13 @@ fun AgentAppRoot(
             onNewConversation = { createConversation() },
             onOpenTerminal = { pushRoute(AppRoute.Terminal) },
             onLaunchKimiWeb = {
-                if (appViewModel.kimiWebReady()) {
+                requestExecutionNotifications()
+                if (appViewModel.kimiWebState.phase != KimiWebPhase.NOT_INSTALLED) {
                     appViewModel.launchKimiWeb { result ->
                         if (result is KimiWebLaunchResult.Failed) {
                             Toast.makeText(
                                 context,
-                                when (result.code) {
-                                    "START_FAILED" -> R.string.linux_kimi_web_failed_start
-                                    "URL_TIMEOUT" -> R.string.linux_kimi_web_failed_url
-                                    else -> R.string.linux_kimi_web_failed_browser
-                                },
+                                result.message(context),
                                 Toast.LENGTH_LONG,
                             ).show()
                         }
@@ -192,6 +194,10 @@ fun AgentAppRoot(
                     pushRoute(AppRoute.LinuxEnvironment)
                 }
             },
+            kimiWebLabel = appViewModel.kimiWebState.actionLabel(context),
+            canStopKimiWeb = appViewModel.kimiWebState.canStop,
+            onStopKimiWeb = appViewModel::stopKimiWeb,
+            onRefreshKimiWeb = appViewModel::refreshKimiWeb,
             onOpenBrowser = { pushRoute(AppRoute.Browser) },
             onSelectConversation = { conversationId -> selectConversation(conversationId) },
             onConversationRename = { conversation ->
@@ -242,7 +248,7 @@ fun AgentAppRoot(
                                 is AgentHomeAction.ReasoningEffortChanged ->
                                     agentState.updateReasoningEffort(action.effort)
                                 is AgentHomeAction.ModelSelected -> agentState.selectModel(action.modelId)
-                                is AgentHomeAction.SubmitMessage -> agentState.sendCurrentMessage(action.text)
+                                is AgentHomeAction.SubmitMessage -> { requestExecutionNotifications(); agentState.sendCurrentMessage(action.text) }
                                 AgentHomeAction.StopRun -> agentState.stopCurrentRun()
                                 is AgentHomeAction.ImageAttached -> agentState.attachImage(action.uri)
                                 is AgentHomeAction.RemoveImage -> agentState.removePendingImage(action.id)
@@ -291,7 +297,7 @@ fun AgentAppRoot(
                                 is AgentChatAction.ReasoningEffortChanged ->
                                     agentState.updateReasoningEffort(action.effort)
                                 is AgentChatAction.ModelSelected -> agentState.selectModel(action.modelId)
-                                is AgentChatAction.SubmitMessage -> agentState.sendCurrentMessage(action.text)
+                                is AgentChatAction.SubmitMessage -> { requestExecutionNotifications(); agentState.sendCurrentMessage(action.text) }
                                 AgentChatAction.StopRun -> agentState.stopCurrentRun()
                                 AgentChatAction.OpenBrowser -> pushRoute(AppRoute.Browser)
                                 is AgentChatAction.ImageAttached -> agentState.attachImage(action.uri)
@@ -327,6 +333,7 @@ fun AgentAppRoot(
                 }
             }
             entry<AppRoute.Terminal>(swipeDismiss = swipeDismiss) {
+                LaunchedEffect(Unit) { requestExecutionNotifications() }
                 RoutedShell(route = AppRoute.Terminal) {
                     TerminalEntryScreen(
                         terminalStore = appViewModel.terminalStore,
@@ -342,6 +349,8 @@ fun AgentAppRoot(
                         when (action) {
                             AgentToolsAction.NavigateBack -> popRoute()
                             AgentToolsAction.OpenBrowser -> pushRoute(AppRoute.Browser)
+                            AgentToolsAction.OpenEnhancements -> pushRoute(AppRoute.SystemEnhance)
+                            AgentToolsAction.OpenPermissions -> pushRoute(AppRoute.Permissions)
                         }
                     },
                 )
@@ -393,7 +402,7 @@ fun AgentAppRoot(
                                         }
                                     }
                                     "background" -> {
-                                        if (Build.MANUFACTURER.lowercase() in setOf("oppo", "realme", "oneplus")) {
+                                        if (RootAccess.isGranted && Build.MANUFACTURER.lowercase() in setOf("oppo", "realme", "oneplus")) {
                                             uiScope.launch(Dispatchers.IO) {
                                                 BoundedRootCommandExecutor(AndroidAgentLogger).use {
                                                     it.execute(
@@ -461,17 +470,11 @@ fun AgentAppRoot(
                                             context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                                         }
                                     }
-                                    "root" -> {
-                                        uiScope.launch {
-                                            try {
-                                                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
-                                                process.waitFor()
-                                            } catch (e: Exception) {
-                                                // no-op
-                                            }
-                                            agentState.refreshPermissionHealth()
-                                        }
+                                    "notifications" -> {
+                                        context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
                                     }
+                                    "root" -> pushRoute(AppRoute.SystemEnhance)
                                 }
                             }
                         }
@@ -480,14 +483,17 @@ fun AgentAppRoot(
             }
             entry<AppRoute.SystemEnhance>(swipeDismiss = swipeDismiss) {
                 SystemEnhanceScreen(
-                    state = agentState.systemEnhanceState,
                     onAction = { action ->
                         when (action) {
                             AgentSystemEnhanceAction.NavigateBack -> popRoute()
-                            is AgentSystemEnhanceAction.ToggleItem -> Unit
+                            AgentSystemEnhanceAction.RequestRoot -> { RootAccess.request(context) }
+                            AgentSystemEnhanceAction.RefreshRoot -> { RootAccess.refresh(context) }
                         }
                     },
                 )
+            }
+            entry<AppRoute.Workspace>(swipeDismiss = swipeDismiss) {
+                WorkspaceScreen(onBack = ::popRoute)
             }
             entry<AppRoute.Settings>(swipeDismiss = swipeDismiss) {
                 SettingsScreen(
@@ -571,7 +577,7 @@ fun AgentAppRoot(
             }
             entry<AppRoute.ModelProviderNew>(swipeDismiss = swipeDismiss) { route ->
                 ModelProviderDetailScreen(
-                    newType = route.type,
+                    newType = route.providerType,
                     onBack = ::popRoute
                 )
             }

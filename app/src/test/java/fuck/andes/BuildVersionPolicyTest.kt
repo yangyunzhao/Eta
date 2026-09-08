@@ -6,8 +6,8 @@ import org.junit.Test
 class BuildVersionPolicyTest {
     @Test
     fun `当前构建使用首个 znmlr 下游候选版本`() {
-        assertEquals("3.0.0.znmlr.1", BuildConfig.VERSION_NAME)
-        assertEquals(2_026_083_101, BuildConfig.VERSION_CODE)
+        assertEquals("3.0.2.znmlr.1", BuildConfig.VERSION_NAME)
+        assertEquals(2_026_090_701, BuildConfig.VERSION_CODE)
     }
 
     @Test
@@ -17,15 +17,15 @@ class BuildVersionPolicyTest {
         val downstreamReleaseSequence =
             requiredProperty("eta.test.downstreamReleaseSequence").toInt()
 
-        assertEquals("3.0.0", upstreamVersionName)
-        assertEquals(20_260_831, upstreamVersionCode)
+        assertEquals("3.0.2", upstreamVersionName)
+        assertEquals(2_026_090_701, upstreamVersionCode)
         assertEquals(1, downstreamReleaseSequence)
         assertEquals(
             "$upstreamVersionName.znmlr.$downstreamReleaseSequence",
             BuildConfig.VERSION_NAME,
         )
         assertEquals(
-            upstreamVersionCode * 100 + downstreamReleaseSequence,
+            upstreamVersionCode + downstreamReleaseSequence - 1,
             BuildConfig.VERSION_CODE,
         )
     }

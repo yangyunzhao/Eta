@@ -6,6 +6,7 @@ import fuck.andes.agent.runtime.AgentRunController
 import fuck.andes.agent.memory.AgentMemoryContext
 import fuck.andes.agent.skill.SkillContext
 import fuck.andes.config.Prefs
+import fuck.andes.agent.tool.AgentToolCapabilities
 import fuck.andes.data.model.AnthropicProviderSetting
 import fuck.andes.data.model.CustomBody
 import fuck.andes.data.model.CustomHeader
@@ -93,9 +94,11 @@ internal object AgentModelClient {
         skillContext: SkillContext = SkillContext.EMPTY,
         memoryContext: AgentMemoryContext = AgentMemoryContext.DISABLED,
         additionalTools: JSONArray = JSONArray(),
+        capabilitiesProvider: () -> AgentToolCapabilities = { AgentToolCapabilities(rootAvailable = false) },
         onEvent: (AgentEvent) -> Unit = {}
     ): ModelResponse.Text {
         config.validateForTest()
+        val initialCapabilities = capabilitiesProvider()
         val messages = AgentPromptBuilder.buildInitialMessages(
             config,
             prompt,
@@ -103,21 +106,27 @@ internal object AgentModelClient {
             history,
             skillContext,
             memoryContext,
+            rootAvailable = initialCapabilities.rootAvailable,
         )
         val transcriptStartIndex = messages.length()
-        val tools = AgentToolCatalog.build(
-            terminalTools = config.terminalTools,
-            browserTools = config.browserTools,
-            deviceDirectTools = config.deviceDirectTools,
-            deviceSensitiveReadTools = config.deviceSensitiveReadTools,
-            deviceSensitiveActionTools = config.deviceSensitiveActionTools,
-            skillGitHubDiscovery = true,
-            skillGitHubInstall = true,
-            memoryTools = memoryContext.enabled,
-        )
-        for (index in 0 until additionalTools.length()) {
-            tools.put(additionalTools.opt(index))
+        fun toolsFor(capabilities: AgentToolCapabilities): JSONArray {
+            val tools = AgentToolCatalog.build(
+                terminalTools = config.terminalTools,
+                browserTools = config.browserTools,
+                deviceDirectTools = config.deviceDirectTools,
+                deviceSensitiveReadTools = config.deviceSensitiveReadTools,
+                deviceSensitiveActionTools = config.deviceSensitiveActionTools,
+                skillGitHubDiscovery = true,
+                skillGitHubInstall = true,
+                memoryTools = memoryContext.enabled,
+                capabilities = capabilities,
+            )
+            for (index in 0 until additionalTools.length()) {
+                tools.put(additionalTools.opt(index))
+            }
+            return tools
         }
+        val tools = toolsFor(initialCapabilities)
         onEvent(
             AgentEvent.RunStarted(
                 initialImages = images.size,
@@ -126,6 +135,7 @@ internal object AgentModelClient {
                 terminalTools = config.terminalTools
             )
         )
+        var promptRootAvailable = initialCapabilities.rootAvailable
         val loop = AgentLoop(
             config = config,
             messages = messages,
@@ -135,6 +145,19 @@ internal object AgentModelClient {
             runController = runController,
             traceFormatter = traceFormatter,
             onEvent = onEvent,
+            toolsForRound = {
+                val capabilities = capabilitiesProvider()
+                if (capabilities.rootAvailable != promptRootAvailable) {
+                    val systemMessages = AgentPromptBuilder.buildSystemMessages(
+                        config, skillContext, memoryContext, capabilities.rootAvailable,
+                    )
+                    for (index in 0 until systemMessages.length()) {
+                        messages.put(index, systemMessages.getJSONObject(index))
+                    }
+                    promptRootAvailable = capabilities.rootAvailable
+                }
+                toolsFor(capabilities)
+            },
         )
         val result = try {
             loop.run()

@@ -12,19 +12,22 @@ import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import fuck.andes.EtaApp
 import fuck.andes.R
 import fuck.andes.agent.accessibility.AgentAccessibilityService
 import fuck.andes.agent.device.AgentFileReferenceGateway
 import fuck.andes.agent.device.DeviceLocationProvider
+import fuck.andes.agent.device.RootAccess
 import fuck.andes.agent.media.AgentImageCodec
 import fuck.andes.agent.memory.AgentMemoryContextBuilder
-import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.agent.model.AgentFileReference
 import fuck.andes.agent.model.AgentFileReferenceKind
 import fuck.andes.agent.model.AgentFileReferencePolicy
 import fuck.andes.agent.model.AgentFileReferencePromptCodec
+import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.agent.runtime.AgentEvent
+import fuck.andes.agent.runtime.AgentExecutionService
 import fuck.andes.agent.runtime.AgentExternalArchivePayload
 import fuck.andes.agent.runtime.AgentRunArchiveStore
 import fuck.andes.agent.runtime.AgentRunCheckpointStore
@@ -45,29 +48,24 @@ import fuck.andes.data.repository.ProviderRepository
 import fuck.andes.data.repository.RuntimeConfigRepository
 import fuck.andes.ui.model.AgentChatHomeUiState
 import fuck.andes.ui.model.AgentChatMessageUi
-import fuck.andes.ui.model.AgentMessageUi
 import fuck.andes.ui.model.AgentMemoryUiState
+import fuck.andes.ui.model.AgentMessageUi
 import fuck.andes.ui.model.AgentModelPickerProjector
 import fuck.andes.ui.model.AgentModelPickerUiState
-import fuck.andes.ui.model.MessageEditUiState
 import fuck.andes.ui.model.AgentSkillsUiState
-import fuck.andes.ui.model.AgentSystemEnhanceUiState
 import fuck.andes.ui.model.AgentToolsUiState
 import fuck.andes.ui.model.ConversationModeUi
 import fuck.andes.ui.model.ConversationPaneUiState
 import fuck.andes.ui.model.ConversationSummaryUi
+import fuck.andes.ui.model.MessageEditUiState
+import fuck.andes.ui.model.PendingFileReferenceUi
+import fuck.andes.ui.model.PendingImageUi
 import fuck.andes.ui.model.PermissionHealthItemUi
 import fuck.andes.ui.model.PermissionHealthUiState
 import fuck.andes.ui.model.PermissionStatusUi
-import fuck.andes.ui.model.PendingImageUi
-import fuck.andes.ui.model.PendingFileReferenceUi
 import fuck.andes.ui.model.SkillItemUi
 import fuck.andes.ui.model.SkillNoticeUi
 import fuck.andes.ui.model.SkillReplacementUi
-import fuck.andes.ui.model.canDeleteUserSkill
-import fuck.andes.ui.model.SystemEnhanceItemUi
-import fuck.andes.ui.model.SystemEnhanceSectionUi
-import fuck.andes.ui.model.SystemEnhanceStatusUi
 import fuck.andes.ui.model.SystemNoticeCode
 import fuck.andes.ui.model.SystemNoticeMessageUi
 import fuck.andes.ui.model.ThinkingMessageUi
@@ -76,12 +74,14 @@ import fuck.andes.ui.model.ToolActivityMessageUi
 import fuck.andes.ui.model.ToolGroupUi
 import fuck.andes.ui.model.ToolItemUi
 import fuck.andes.ui.model.UserMessageUi
+import fuck.andes.ui.model.canDeleteUserSkill
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -91,13 +91,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 internal class AgentAppState(
     context: Context,
     private val scope: CoroutineScope,
     skillZipImportGateway: SkillZipImportGateway? = null,
-    private val startBackgroundInitialization: Boolean = true,
 ) {
     private val appContext = context.applicationContext
     private val skillZipImportGateway = skillZipImportGateway ?: CoreSkillZipImportGateway(appContext)
@@ -146,10 +146,7 @@ internal class AgentAppState(
     var skillsState by mutableStateOf(AgentSkillsUiState(isLoading = true))
         private set
 
-    var permissionHealthState by mutableStateOf(buildPermissionHealthState(appContext))
-        private set
-
-    var systemEnhanceState by mutableStateOf(buildSystemEnhanceState(appContext))
+    var permissionHealthState by mutableStateOf(PermissionHealthUiState(emptyList()))
         private set
 
     var memoryState by mutableStateOf(AgentMemoryUiState())
@@ -157,16 +154,17 @@ internal class AgentAppState(
 
     init {
         refreshConversationSummaries()
-        if (startBackgroundInitialization) {
-            observeRuntimeSelection()
-            runtimeRecoveryInProgress.set(true)
-            scope.launch(Dispatchers.IO) {
-                try {
-                    recoverRuntimeRuns()
-                    importArchivedExternalRuns()
-                } finally {
-                    runtimeRecoveryInProgress.set(false)
-                }
+        observeRuntimeSelection()
+        scope.launch {
+            RootAccess.state.collectLatest { refreshPermissionHealth() }
+        }
+        runtimeRecoveryInProgress.set(true)
+        scope.launch(Dispatchers.IO) {
+            try {
+                recoverRuntimeRuns()
+                importArchivedExternalRuns()
+            } finally {
+                runtimeRecoveryInProgress.set(false)
             }
         }
     }
@@ -549,7 +547,7 @@ internal class AgentAppState(
 
         runConversationIds[runId] = conversationId
         updateConversation(conversationId, existing.copy(isStreaming = true))
-        checkpoint.events.forEach { event -> applyRunEvent(runId, event) }
+        restoreRunEvents(runId, checkpoint.events)
         flushPendingRunDelta(runId)
         updateRunTrace(runId) { messages ->
             val finalizedThinking = runMessageProjector.finalizeThinking(runId, messages)
@@ -569,7 +567,7 @@ internal class AgentAppState(
                     )
                 }
             } else {
-                finalizedText
+                runMessageProjector.finalizeRun(runId, finalizedText)
             }
         }
         setConversationStreaming(runId, false)
@@ -594,7 +592,12 @@ internal class AgentAppState(
         refreshConversationSummaries()
         currentRunJob = scope.launch(Dispatchers.IO) {
             val client = AgentRuntimeClient(appContext, AndroidAgentLogger)
-            when (val outcome = client.attachRun(runId) { event -> enqueueRunEvent(runId, event) }) {
+            val outcome = client.attachRun(
+                runId = runId,
+                onReplay = { events -> restoreRunEvents(runId, events) },
+                onEvent = { event -> enqueueRunEvent(runId, event) },
+            )
+            when (outcome) {
                 is AgentRuntimeClient.AttachOutcome.Completed -> withContext(Dispatchers.Main) {
                     applyRunResult(
                         runId = runId,
@@ -1048,7 +1051,7 @@ internal class AgentAppState(
         refreshConversationSummaries()
         val initialPersistence = persistConversations()
 
-        currentRunJob = scope.launch(Dispatchers.IO) {
+        val preparationJob = scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             // write-ahead：用户消息未提交前不把可能产生副作用的 run 交给 Runtime。
             if (!initialPersistence.await()) {
                 withContext(Dispatchers.Main) {
@@ -1104,25 +1107,48 @@ internal class AgentAppState(
                     source = "user_attach",
                 )
             }
-            val result = AgentRuntimeClient(appContext, AndroidAgentLogger).run(
-                request = AgentRuntimeWire.RunRequest(
-                    runId = runId,
-                    prompt = prompt,
-                    config = config,
-                    images = modelImages,
-                    history = history,
-                    handoff = AgentRuntimeWire.EntryHandoff(
-                        id = runId,
-                        source = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
-                        payload = conversationId,
+            val result = runInterruptible {
+                AgentRuntimeClient(appContext, AndroidAgentLogger).run(
+                    request = AgentRuntimeWire.RunRequest(
+                        runId = runId,
+                        prompt = prompt,
+                        config = config,
+                        images = modelImages,
+                        history = history,
+                        handoff = AgentRuntimeWire.EntryHandoff(
+                            id = runId,
+                            source = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
+                            payload = conversationId,
+                        ),
                     ),
-                ),
-                onEvent = { event -> enqueueRunEvent(runId, event) },
-            )
+                    onEvent = { event -> enqueueRunEvent(runId, event) },
+                )
+            }
             withContext(Dispatchers.Main) {
                 applyRunResult(runId, result, acknowledgeRuntimeResult = true)
             }
         }
+        currentRunJob = preparationJob
+        if (!RootAccess.isGranted) {
+            val leaseId = "prepare:$runId"
+            val acquired = AgentExecutionService.acquire(appContext, leaseId) {
+                scope.launch(Dispatchers.Main.immediate) {
+                    if (currentRunId == runId) stopCurrentRun()
+                }
+            }
+            if (!acquired) {
+                preparationJob.cancel()
+                applyRunResult(runId, AgentRuntimeWire.RunResult(
+                    runId = runId,
+                    ok = false,
+                    content = "",
+                    error = appContext.getString(R.string.capability_background_failed),
+                ))
+                return
+            }
+            preparationJob.invokeOnCompletion { AgentExecutionService.release(leaseId) }
+        }
+        preparationJob.start()
     }
 
     private fun List<PendingImageUi>.toHistoryImages(): List<AgentModelClient.ModelImage> =
@@ -1307,12 +1333,15 @@ internal class AgentAppState(
     private val AgentFileReferenceGateway.Error.userMessage: String
         get() = when (this) {
             AgentFileReferenceGateway.Error.UnsupportedDocumentProvider ->
-                appContext.getString(R.string.state_ui_unable_to_obtain_the_real_path_please_select_fro_32f367)
+                appContext.getString(R.string.capability_import_denied)
             AgentFileReferenceGateway.Error.InvalidPath -> appContext.getString(R.string.state_ui_please_enter_a_valid_absolute_path_6afeb4)
             AgentFileReferenceGateway.Error.PathNotFound -> appContext.getString(R.string.state_ui_the_path_does_not_exist_or_is_no_longer_accessib_a9776e)
             AgentFileReferenceGateway.Error.UnsupportedFileType -> appContext.getString(R.string.state_ui_only_supports_normal_files_and_folders_4adea0)
             AgentFileReferenceGateway.Error.TypeMismatch -> appContext.getString(R.string.state_ui_the_selected_project_type_does_not_match_3a5c49)
             AgentFileReferenceGateway.Error.RootUnavailable -> appContext.getString(R.string.state_ui_root_is_not_available_and_the_path_cannot_be_ver_fc4c81)
+            AgentFileReferenceGateway.Error.AccessDenied -> appContext.getString(R.string.capability_import_denied)
+            AgentFileReferenceGateway.Error.ImportFailed -> appContext.getString(R.string.capability_import_failed)
+            AgentFileReferenceGateway.Error.ImportTooLarge -> appContext.getString(R.string.capability_import_too_large)
             AgentFileReferenceGateway.Error.ValidationTimedOut -> appContext.getString(R.string.state_ui_path_verification_timed_out_please_try_again_703687)
         }
 
@@ -1338,8 +1367,14 @@ internal class AgentAppState(
         persistConversations()
     }
 
+    private var permissionRefreshJob: Job? = null
+
     fun refreshPermissionHealth() {
-        permissionHealthState = buildPermissionHealthState(appContext)
+        permissionRefreshJob?.cancel()
+        permissionRefreshJob = scope.launch(Dispatchers.IO) {
+            val refreshed = buildPermissionHealthState(appContext)
+            withContext(Dispatchers.Main) { permissionHealthState = refreshed }
+        }
     }
 
     fun refreshSkills() {
@@ -1541,6 +1576,23 @@ internal class AgentAppState(
         }
     }
 
+    private fun restoreRunEvents(runId: String, events: List<AgentEvent>) {
+        // 恢复是完整快照：先清除同一 run 的旧投影，再一次发布，避免历史增量重复追加
+        // 或中途的 Running 状态使已结束的思考重新展开、播放动画。
+        Snapshot.withMutableSnapshot {
+            flushPendingRunDelta(runId)
+            updateMessages(runId, updateTimestamp = false) { messages ->
+                runMessageProjector.resetForReplay(
+                    runId = runId,
+                    messages = messages,
+                    replaySupplementIndexes = events.filterIsInstance<AgentEvent.UserSupplementReceived>()
+                        .mapTo(mutableSetOf()) { it.index },
+                )
+            }
+            events.forEach { event -> applyRunEvent(runId, event, persistSupplement = false) }
+        }
+    }
+
     private fun enqueueRunEvent(runId: String, event: AgentEvent) {
         if (event is AgentEvent.AssistantBlockDelta) {
             if (event.kind == AgentEvent.AssistantBlockKind.TOOL_CALL || event.delta.isEmpty()) return
@@ -1723,7 +1775,11 @@ internal class AgentAppState(
     private fun String.safeSkillDisplayName(): String =
         lineSequence().firstOrNull().orEmpty().trim().ifBlank { appContext.getString(R.string.state_ui_unnamed_skill_a58008) }.take(80)
 
-    private fun applyRunEvent(runId: String, event: AgentEvent) {
+    private fun applyRunEvent(
+        runId: String,
+        event: AgentEvent,
+        persistSupplement: Boolean = true,
+    ) {
         when (event) {
             is AgentEvent.AssistantBlockStart -> {
                 updateRunTrace(runId) { messages ->
@@ -1788,7 +1844,7 @@ internal class AgentAppState(
             }
 
             is AgentEvent.UserSupplementReceived -> {
-                insertSupplementMessage(runId, event.index, event.text)
+                insertSupplementMessage(runId, event.index, event.text, persist = persistSupplement)
             }
 
             is AgentEvent.ToolStarted -> {
@@ -1818,6 +1874,12 @@ internal class AgentAppState(
             is AgentEvent.HostedToolFinished -> {
                 updateRunTrace(runId) { messages ->
                     runMessageProjector.finishHostedTool(runId, event, messages)
+                }
+            }
+
+            is AgentEvent.ModelRetryScheduled -> {
+                updateRunTrace(runId) { messages ->
+                    runMessageProjector.scheduleModelRetry(runId, event, messages)
                 }
             }
 
@@ -1868,6 +1930,7 @@ internal class AgentAppState(
             currentRunId = null
             currentRunJob = null
         }
+        updateRunTrace(runId) { messages -> runMessageProjector.finalizeRun(runId, messages) }
         applyConversationHistoryResult(runId, result.transcript)
         when {
             result.ok && result.content.isNotBlank() -> completeLatestAssistantMessage(
@@ -1924,7 +1987,12 @@ internal class AgentAppState(
         }
     }
 
-    private fun insertSupplementMessage(runId: String, index: Int, text: String) {
+    private fun insertSupplementMessage(
+        runId: String,
+        index: Int,
+        text: String,
+        persist: Boolean = true,
+    ) {
         updateMessages(runId) { messages ->
             AgentPendingResultRecovery.mergeSupplements(
                 runId = runId,
@@ -1939,7 +2007,7 @@ internal class AgentAppState(
             )
         }
         refreshConversationSummaries()
-        persistConversations()
+        if (persist) persistConversations()
     }
 
     private fun completeLatestAssistantMessage(
@@ -1947,12 +2015,10 @@ internal class AgentAppState(
         fallbackContent: String,
     ) {
         updateMessages(runId) { messages ->
-            val targetIndex = messages.indexOfLast { message ->
-                message is AgentMessageUi && message.id.startsWith(assistantMessagePrefix(runId))
-            }
+            val targetIndex = AgentRunMessageProjector.resultTargetIndex(runId, messages)
             if (targetIndex < 0) {
                 messages + AgentMessageUi(
-                    id = assistantFallbackMessageId(runId),
+                    id = AgentRunMessageProjector.resultFallbackId(runId, messages),
                     content = fallbackContent,
                     isStreaming = false,
                     renderMarkdown = true,
@@ -1990,11 +2056,9 @@ internal class AgentAppState(
         detail: String? = null,
     ) {
         updateMessages(runId) { messages ->
-            val targetIndex = messages.indexOfLast { message ->
-                message is AgentMessageUi && message.id.startsWith(assistantMessagePrefix(runId))
-            }
+            val targetIndex = AgentRunMessageProjector.resultTargetIndex(runId, messages)
             if (targetIndex < 0) {
-                messages + SystemNoticeMessageUi(assistantFallbackMessageId(runId), code, detail)
+                messages + SystemNoticeMessageUi(AgentRunMessageProjector.resultFallbackId(runId, messages), code, detail)
             } else {
                 messages.mapIndexed { index, message ->
                     if (index == targetIndex && message is AgentMessageUi) {
@@ -2126,6 +2190,7 @@ internal class AgentAppState(
                             when (lastMessage.code) {
                                 SystemNoticeCode.Stopped -> R.string.system_notice_stopped
                                 SystemNoticeCode.EmptyResult -> R.string.system_notice_empty_result
+                                SystemNoticeCode.ModelRetry -> R.string.system_notice_model_retry
                                 SystemNoticeCode.RuntimeFailed -> R.string.system_notice_runtime_failed
                                 SystemNoticeCode.Interrupted -> R.string.system_notice_interrupted
                             },
@@ -2248,7 +2313,7 @@ private fun stableArchiveId(value: String): String =
         .take(12)
         .joinToString(separator = "") { byte -> "%02x".format(byte) }
 
-private fun buildToolsState(context: Context): AgentToolsUiState =
+internal fun buildToolsState(context: Context): AgentToolsUiState =
     AgentToolsUiState(
         groups = listOf(
             ToolGroupUi(
@@ -2390,7 +2455,8 @@ private fun buildPermissionHealthState(context: Context): PermissionHealthUiStat
     val overlayEnabled = Settings.canDrawOverlays(context)
     val appListEnabled = hasAppListAccess(context)
     val accessibilityEnabled = isAgentAccessibilityEnabled(context) || AgentAccessibilityService.isAvailable()
-    val rootEnabled = isRootAvailable()
+    val rootEnabled = RootAccess.isGranted
+    val notificationsEnabled = context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()
     val locationAccess = DeviceLocationProvider.accessState(context)
     val notificationHistoryEnabled = fuck.andes.agent.device.AgentNotificationHistoryService.isEnabled(context)
     val usageAccessEnabled = fuck.andes.agent.tool.AgentPersonalContextTools.hasUsageAccess(context)
@@ -2423,7 +2489,7 @@ private fun buildPermissionHealthState(context: Context): PermissionHealthUiStat
                 title = context.getString(R.string.state_location_permissions_b53f9c),
                 summary = when (locationAccess) {
                     DeviceLocationProvider.AccessState.DENIED -> context.getString(R.string.state_ui_used_to_understand_the_location_of_mobile_phones_af52e9)
-                    DeviceLocationProvider.AccessState.FOREGROUND_ONLY -> context.getString(R.string.state_ui_xiaobu_s_entrance_needs_to_be_set_to_always_allo_cc74cb)
+                    DeviceLocationProvider.AccessState.FOREGROUND_ONLY -> context.getString(R.string.capability_location_foreground)
                     DeviceLocationProvider.AccessState.DISABLED -> context.getString(R.string.state_ui_system_location_service_is_turned_off_3902e7)
                     DeviceLocationProvider.AccessState.AVAILABLE -> context.getString(R.string.state_ui_only_read_when_the_agent_calls_the_tool_8cf77b)
                 },
@@ -2466,10 +2532,17 @@ private fun buildPermissionHealthState(context: Context): PermissionHealthUiStat
                 primaryActionLabel = if (accessibilityEnabled) null else context.getString(R.string.state_ui_to_open_13ec17),
             ),
             PermissionHealthItemUi(
+                id = "notifications",
+                title = context.getString(R.string.capability_notifications_title),
+                summary = context.getString(R.string.capability_notifications_summary),
+                status = if (notificationsEnabled) PermissionStatusUi.Available else PermissionStatusUi.Disabled,
+                primaryActionLabel = context.getString(R.string.state_ui_go_to_settings_1f2998),
+            ),
+            PermissionHealthItemUi(
                 id = "root",
-                title = context.getString(R.string.state_root_permissions_958906),
-                summary = "",
-                status = if (rootEnabled) PermissionStatusUi.Available else PermissionStatusUi.Missing,
+                title = context.getString(R.string.capability_enhancements),
+                summary = context.getString(R.string.capability_optional_root),
+                status = if (rootEnabled) PermissionStatusUi.Available else PermissionStatusUi.Disabled,
                 primaryActionLabel = if (rootEnabled) null else context.getString(R.string.state_ui_to_open_13ec17),
             ),
         )
@@ -2489,48 +2562,6 @@ private fun AgentTokenUsage.toUi(): TokenUsageUi =
         cachedTokens = cachedTokens,
     )
 
-private fun buildSystemEnhanceState(context: Context): AgentSystemEnhanceUiState =
-    AgentSystemEnhanceUiState(
-        sections = listOf(
-            SystemEnhanceSectionUi(
-                id = "runtime",
-                title = "Agent Runtime",
-                items = listOf(
-                    SystemEnhanceItemUi(
-                        id = "streaming",
-                        title = context.getString(R.string.state_streaming_events_360e09),
-                        summary = context.getString(R.string.state_model_increments_tool_calls_and_final_results_are_sy_3f2321),
-                        status = SystemEnhanceStatusUi.Active,
-                    ),
-                    SystemEnhanceItemUi(
-                        id = "memory",
-                        title = context.getString(R.string.state_memory_system_4903eb),
-                        summary = context.getString(R.string.state_core_memory_is_automatically_injected_and_detailed_c_07232b),
-                        status = SystemEnhanceStatusUi.Active,
-                    ),
-                    SystemEnhanceItemUi(
-                        id = "overlay",
-                        title = context.getString(R.string.state_run_floating_window_48af02),
-                        summary = context.getString(R.string.state_runtime_displays_a_status_pop_up_window_when_the_ser_54f285),
-                        status = SystemEnhanceStatusUi.Active,
-                    ),
-                ),
-            ),
-            SystemEnhanceSectionUi(
-                id = "future",
-                title = context.getString(R.string.state_follow_up_ability_589688),
-                items = listOf(
-                    SystemEnhanceItemUi(
-                        id = "hook",
-                        title = context.getString(R.string.state_hook_secondary_ability_95afe3),
-                        summary = context.getString(R.string.state_system_enhancement_capabilities_are_reserved_for_sub_0a8b21),
-                        status = SystemEnhanceStatusUi.Inactive,
-                    ),
-                ),
-            ),
-        )
-    )
-
 private fun isAgentAccessibilityEnabled(context: Context): Boolean {
     val expected = ComponentName(
         context,
@@ -2546,16 +2577,6 @@ private fun isAgentAccessibilityEnabled(context: Context): Boolean {
 private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
     return powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: false
-}
-
-private fun isRootAvailable(): Boolean {
-    return try {
-        val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
-        val exitCode = process.waitFor()
-        exitCode == 0
-    } catch (e: Exception) {
-        false
-    }
 }
 
 private fun hasAppListAccess(context: Context): Boolean {

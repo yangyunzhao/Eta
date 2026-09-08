@@ -358,7 +358,6 @@ class AgentConversationStoreTest {
             val state = AgentAppState(
                 context = context,
                 scope = scope,
-                startBackgroundInitialization = false,
             )
 
             state.createConversation()

@@ -1,5 +1,6 @@
 package fuck.andes.hook.system
 
+import fuck.andes.hook.hyperos.HyperOsPowerHooks
 import fuck.andes.core.HookInstallation
 import fuck.andes.core.ModuleLogger
 
@@ -18,7 +19,8 @@ internal object SystemServerHooks {
             ContextualSearchHooks.install(module, logger, classLoader),
             AssistantManager.install(module, logger, classLoader),
             HotwordSelfHealHooks.install(module, logger, classLoader),
-            PowerHooks.install(module, logger, classLoader)
+            PowerHooks.install(module, logger, classLoader),
+            HyperOsPowerHooks.install(module, logger, classLoader)
         )
     )
 }

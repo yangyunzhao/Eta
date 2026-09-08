@@ -2,17 +2,20 @@ package fuck.andes.ui.app
 
 import android.content.Context
 import androidx.compose.runtime.Immutable
+import fuck.andes.R
 import fuck.andes.agent.terminal.ConsoleSessionController
 import fuck.andes.agent.terminal.LinuxEnvironmentPaths
 import fuck.andes.agent.terminal.SharedFolderMounts
 import fuck.andes.agent.terminal.ShellProcessSupervisor
 import fuck.andes.agent.terminal.TerminalEnvironment
+import fuck.andes.agent.terminal.TerminalRuntime
 import fuck.andes.agent.terminal.TerminalScreenBuffer
 import fuck.andes.agent.terminal.isLinux
 import fuck.andes.agent.terminal.ptySupported
 import fuck.andes.agent.terminal.terminalEnvironment
 import fuck.andes.core.AndroidAgentLogger
 import fuck.andes.data.repository.LinuxEnvironmentSettingsRepository
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -59,7 +62,7 @@ internal data class ConsoleUiState(
 /**
  * 控制台页面的 App 级状态所有者：持有多个 PTY 会话与各自独立的屏幕缓冲区，
  * 字节流在 IO 线程喂入 [TerminalScreenBuffer]，按节流节奏向 UI 发布当前会话的帧。
- * 离开页面会话仍存活；整体回收由 ViewModel 的 onCleared 触发。
+ * 离开页面会话仍存活；普通会话由前台执行服务持有，用户停止后回收。
  */
 internal class ConsoleStore(
     context: Context,
@@ -71,6 +74,7 @@ internal class ConsoleStore(
     }
 
     private val appContext = context.applicationContext
+    private val sessionLeases = ConcurrentHashMap<String, TerminalSessionLease>()
     private val controller = ConsoleSessionController(
         logger = AndroidAgentLogger,
         linuxRootfsPathProvider = { environment ->
@@ -166,7 +170,10 @@ internal class ConsoleStore(
 
     /** 关闭指定会话；关闭当前会话时切换到剩余最近的会话，没有则回到空态。 */
     fun closeSession(sessionId: String) {
-        scope.launch(Dispatchers.IO) { controller.closeSession(sessionId) }
+        scope.launch(Dispatchers.IO) {
+            controller.closeSession(sessionId)
+            sessionLeases.remove(sessionId)?.release()
+        }
         synchronized(bufferLock) { buffers.remove(sessionId) }
         sessionSizes.remove(sessionId)
         _uiState.update { state ->
@@ -194,7 +201,10 @@ internal class ConsoleStore(
         val session = _uiState.value.sessions.find { it.id == sessionId } ?: return
         val size = sessionSizes[sessionId] ?: (lastCols to lastRows)
         if (size.first <= 0 || size.second <= 0) return
-        scope.launch(Dispatchers.IO) { controller.closeSession(sessionId) }
+        scope.launch(Dispatchers.IO) {
+            controller.closeSession(sessionId)
+            sessionLeases.remove(sessionId)?.release()
+        }
         synchronized(bufferLock) { buffers.remove(sessionId) }
         sessionSizes.remove(sessionId)
         _uiState.update { state ->
@@ -237,6 +247,8 @@ internal class ConsoleStore(
 
     fun close() {
         controller.close()
+        sessionLeases.values.forEach { it.release() }
+        sessionLeases.clear()
     }
 
     private fun createSession(environment: TerminalEnvironment, cols: Int, rows: Int) {
@@ -245,15 +257,41 @@ internal class ConsoleStore(
         lastRows = rows
         _uiState.update { it.copy(connected = false, exited = false, failMessage = null) }
         scope.launch(Dispatchers.IO) {
-            val result = controller.open(
-                environment = environment,
-                cols = cols,
-                rows = rows,
-                onOutput = ::onOutput,
-                onExit = ::onExit,
-            )
+            val rootfs = environment.linuxDistribution?.let { LinuxEnvironmentPaths.rootfsDir(appContext, it).absolutePath }
+            val identity = TerminalRuntime.defaultIdentity(environment, rootfs)
+            val lease = if (identity == "user") {
+                TerminalSessionLease.acquire(appContext) { sessionId -> scope.launch { closeSession(sessionId) } } ?: run {
+                    _uiState.update { it.copy(failMessage = appContext.getString(R.string.capability_background_failed)) }
+                    return@launch
+                }
+            } else null
+            val result = try {
+                controller.open(
+                    environment = environment,
+                    identity = identity,
+                    cols = cols,
+                    rows = rows,
+                    onOutput = ::onOutput,
+                    onExit = { sessionId ->
+                        lease?.release()
+                        onExit(sessionId)
+                    },
+                )
+            } catch (failure: Throwable) {
+                lease?.release()
+                throw failure
+            }
             when (result) {
                 is ConsoleSessionController.OpenResult.Ready -> {
+                    if (lease != null) {
+                        sessionLeases[result.sessionId] = lease
+                        if (!lease.attach(result.sessionId) || !controller.sessionAlive(result.sessionId)) {
+                            controller.closeSession(result.sessionId)
+                            sessionLeases.remove(result.sessionId)?.release()
+                            _uiState.update { it.copy(failMessage = appContext.getString(R.string.terminal_session_closed)) }
+                            return@launch
+                        }
+                    }
                     synchronized(bufferLock) {
                         buffers[result.sessionId] = TerminalScreenBuffer(cols, rows, SCROLLBACK_LINES)
                     }
@@ -269,8 +307,10 @@ internal class ConsoleStore(
                         )
                     }
                 }
-                is ConsoleSessionController.OpenResult.Failed ->
+                is ConsoleSessionController.OpenResult.Failed -> {
+                    lease?.release()
                     _uiState.update { it.copy(connected = false, failMessage = result.message) }
+                }
             }
         }
     }
@@ -315,6 +355,7 @@ internal class ConsoleStore(
     }
 
     private fun onExit(sessionId: String) {
+        sessionLeases.remove(sessionId)?.release()
         _uiState.update { state ->
             val sessions = state.sessions.map {
                 if (it.id == sessionId) it.copy(exited = true) else it
