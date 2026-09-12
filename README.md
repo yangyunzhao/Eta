@@ -17,7 +17,7 @@
 
 当前正式发布版本为 [`v3.0.0.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.0.znmlr.1)（`versionCode 2026083101`），基于上游 [`v3.0.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.0)（`0a90eac28a10e34d7b63d5b240afaa2621000282`）。tag CI run `33362303670` 已完成完整单元测试、Lint、签名构建和 APK 校验；公开 Release asset 的 SHA-256 为 `4CD22065D902637466E66DCFDB110E25EFF59884782CF59F036C3CE8D2A57BE3`。用户已完成同证书覆盖安装自测并反馈无问题。
 
-当前本地候选为上游 [`v3.0.2`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.2)（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）对应的 `v3.0.2.znmlr.1` / `2026090701`；候选尚未创建 tag、GitHub Release 或发布资产。
+当前本地候选为上游 [`v3.0.2`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.2)（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）对应的 `v3.0.2.znmlr.1` / `2026090701`；候选 CI run `34668428771` 已通过完整单元测试、Lint、签名构建与 APK 校验。候选尚未创建 tag 或 GitHub Release。
 
 2026-08-31 已按最新官方 Codex CLI `rust-v0.151.0`（peeled `78c290807ce710180111df227df3b7a4fe845452`）核对设备码、刷新、Responses、模型目录与 SSE 终态。未发现必须迁移的不兼容，因此 `CODEX_PROTOCOL_COMPAT_VERSION` 继续表示已完整验证的 `0.147.0` 基线，不机械升级。真实 OAuth 调用、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需最终人工验收。
 

@@ -26,9 +26,10 @@
 | Kotlin Debug 编译 | 通过：`:app:compileDebugKotlin`。 |
 | OAuth/Room/Responses/Runtime/MCP/重试定向回归 | 通过：使用 MockWebServer 或本地替身，不调用真实服务。 |
 | Android Lint | 通过：`:app:lint`；仅禁用上游新增但尚未完整 locale 覆盖的 `MissingTranslation` 和 Compose 回调资源读取规则。 |
-| Release 构建 | 待本候选 merge commit 上执行。 |
+| CI 构建与签名 APK | 通过：[run 34668428771](https://github.com/yangyunzhao/Eta/actions/runs/34668428771) 已完成完整单元测试、Lint、签名构建、APK 校验与上传。 |
+| CI Release APK | `Eta-v3.0.2.znmlr.1-release.apk`，`fuck.andes`，`3.0.2.znmlr.1` / `2026090701`，APK Signature Scheme v2、沿用原证书，SHA-256 `F4A622DCB33162D4C9CC49B3ED460EECD93193FBBB30FD4413CDD855C394F318`。 |
 
 ## 尚未完成
 
-- 未执行完整 JVM 回归、Android instrumentation 或真实 Codex 账号调用。
-- 未创建 tag、GitHub Release 或 CI 资产；不得表述为正式发布。
+- 未执行 Android instrumentation 或真实 Codex 账号调用。
+- 未创建 tag 或 GitHub Release；不得表述为正式发布。
