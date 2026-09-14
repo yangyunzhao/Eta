@@ -11,11 +11,13 @@
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| Codex OAuth 设备码登录 | 已发布 `v3.0.2.znmlr.1` | 认证、加密凭据、刷新、安全 IPC、Codex Responses、固定模型目录、设备码设置页、MCP、运行恢复与跨协议流式块支持均已保留；本次合入上游 `v3.0.2` 的长任务重试、后台恢复、rootless、语言与 HyperOS 改进 |
+| Codex OAuth 设备码登录 | 已发布 `v3.0.2.znmlr.1`；本地候选 `v3.0.4.znmlr.1` | 认证、加密凭据、刷新、安全 IPC、Codex Responses、固定模型目录、设备码设置页、MCP、运行恢复与跨协议流式块支持均已保留；候选已合入角色、上下文压缩、对话搜索/导出与 Runtime 改进 |
 
 使用流程是：在内置 OpenAI Provider 选择 `CODEX_OAUTH`，由 Eta 展示设备码并打开固定 OpenAI 验证页，用户授权后应用通过轮询完成登录。整个流程不使用浏览器回调、Deep Link、WebView 或本地 HTTP 回调服务器。当前已验证的可靠路径是让 Eta 保持前台，并在电脑或另一台设备打开 `https://auth.openai.com/codex/device` 输入验证码；部分手机在切到同机浏览器后会回收 Eta 进程，导致本轮内存登录会话丢失。使用者无需再填写 OpenAI Platform API Key，但请求会消耗登录账号的 Codex 共享额度；共享额度不是无限免费，具体可用量受账号与服务策略约束。
 
 当前正式发布版本为 [`v3.0.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.2.znmlr.1)（`versionCode 2026090701`），基于上游 [`v3.0.2`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.2)（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）。tag CI run [`34794064664`](https://github.com/yangyunzhao/Eta/actions/runs/34794064664) 已完成完整单元测试、Lint、签名构建和 APK 校验；公开 Release asset 的 SHA-256 为 `8DA68A5F1534806FE1700AAB006E1F2B7E96F10B1C99F47B3861918C76B44D0D`。用户已完成同证书覆盖安装及一般功能测试并反馈无问题。
+
+当前本地候选为上游 [`v3.0.4`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.4)（`bc952e27169bf83dbef86380a54fc5b159e5609d`）对应的 `v3.0.4.znmlr.1` / `2026091202`；候选尚未创建 tag 或 GitHub Release。
 
 2026-09-14 已按最新官方 Codex CLI `rust-v0.154.0` 核对发布说明；其 MCP OAuth 协调刷新变化不改变 Eta 的设备码、刷新、固定模型目录/Responses 路径或核心 SSE 终态，因此 `CODEX_PROTOCOL_COMPAT_VERSION` 继续表示已完整验证的 `0.147.0` 基线，不机械升级。真实 OAuth 专项调用、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需最终人工验收。
 
@@ -31,6 +33,7 @@
 - [v2.6.5.znmlr.1 发布核对记录](downstream/RELEASE_V2.6.5_ZNMLR_1_CHECKLIST.md)
 - [上游 v3.0.0 合并记录](downstream/UPSTREAM_V3.0.0_MERGE.md)
 - [上游 v3.0.2 合并记录](downstream/UPSTREAM_V3.0.2_MERGE.md)
+- [上游 v3.0.4 合并记录](downstream/UPSTREAM_V3.0.4_MERGE.md)
 
 ## 与上游的关系
 

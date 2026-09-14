@@ -3,6 +3,10 @@ package fuck.andes.agent.runtime
 import android.content.Context
 import fuck.andes.EtaApp
 import fuck.andes.agent.accessibility.AgentAccessibilityKeeper
+import fuck.andes.agent.model.AgentConversationCodec
+import fuck.andes.agent.model.AgentConversationToolCatalog
+import fuck.andes.agent.tool.ConversationHistoryTool
+import fuck.andes.data.db.EtaDatabase
 import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.agent.model.AgentModelExecutionException
 import fuck.andes.agent.model.AgentModelFailure
@@ -10,6 +14,8 @@ import fuck.andes.agent.model.AgentHttpClient
 import fuck.andes.agent.model.ProviderClientFactory
 import fuck.andes.agent.memory.AgentMemoryContext
 import fuck.andes.agent.memory.AgentMemoryContextBuilder
+import fuck.andes.agent.roleplay.CharacterMemoryTools
+import fuck.andes.agent.roleplay.RoleplayRunContext
 import fuck.andes.agent.mcp.McpRunSnapshot
 import fuck.andes.agent.mcp.McpToolExecutor
 import fuck.andes.agent.mcp.RoutingToolExecutor
@@ -94,6 +100,27 @@ internal class AgentRuntimeRunExecutor(
                     .filter { SkillCompatibilityChecker.evaluate(it).available },
             )
             val memoryEnabled = runBlocking { AgentMemoryRepository.isEnabled() }
+            val uiPayload = request.handoff
+                ?.takeIf { it.source == AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE }
+                ?.let { AgentUiHandoffPayload.from(it.payload) }
+            val conversationId = uiPayload?.conversationId
+                ?.takeIf { it.isNotBlank() }
+            val roleplayContext = conversationId?.let { id ->
+                runBlocking { RoleplayRunContext.resolve(appContext, id, request.config.contextWindow, memoryEnabled) }
+            }
+            if (request.operation == AgentRuntimeWire.OP_REWRITE_REPLY) {
+                require(roleplayContext != null) { "只有角色会话可以改写角色回复" }
+                val target = request.rewriteTargetMessageId?.takeIf { it.isNotBlank() && it.length <= 256 }
+                    ?: throw IllegalArgumentException("缺少有效的角色回复目标")
+                require(runBlocking {
+                    EtaDatabase.get(appContext).conversationDao().hasAssistantMessage(conversationId, target)
+                }) { "角色回复目标不存在或不属于当前会话" }
+            }
+            val characterMemoryTools = roleplayContext?.let { roleplay ->
+                CharacterMemoryTools(appContext, roleplay.characterId) {
+                    runBlocking { AgentMemoryRepository.isEnabled() }
+                }
+            }
             val memoryContext = if (memoryEnabled) {
                 runCatching {
                     AgentMemoryContextBuilder.build(
@@ -143,6 +170,7 @@ internal class AgentRuntimeRunExecutor(
                 memoryToolsEnabled = {
                     runBlocking { AgentMemoryRepository.isEnabled() }
                 },
+                memoryWritable = roleplayContext == null,
                 screenshotExcludedPackages = {
                     entrySurfaceGuard?.consumeScreenshotExcludedPackages().orEmpty()
                 },
@@ -190,6 +218,25 @@ internal class AgentRuntimeRunExecutor(
             toolExecutor = routingExecutor
             toolsBinding = runController.register(routingExecutor::close)
             timing.preparationFinished(skillContext.installedSkills.size)
+            val historyTool = conversationId?.let { id ->
+                ConversationHistoryTool {
+                    val checkpoint = runBlocking { EtaDatabase.get(appContext).conversationDao().contextCheckpoint(id) }
+                    val journal = AgentConversationCodec.decodeTranscript(checkpoint?.journalJson)
+                        .ifEmpty { AgentConversationCodec.decodeTranscript(checkpoint?.historyJson) }
+                    journal + session.transcript
+                }
+            }
+            val runTools = JSONArray(mcpTools.toString()).also { tools ->
+                if (historyTool != null) tools.put(AgentConversationToolCatalog.schema())
+                if (characterMemoryTools != null && memoryEnabled) CharacterMemoryTools.appendSchemas(tools)
+            }
+            val runToolExecutor = AgentModelClient.ToolExecutor { call ->
+                if (call.name == AgentConversationToolCatalog.READ_HISTORY && historyTool != null) {
+                    historyTool.execute(call)
+                } else if (call.name in CharacterMemoryTools.NAMES && characterMemoryTools != null) {
+                    characterMemoryTools.execute(call)
+                } else routingExecutor.execute(call)
+            }
             val modelProvider = ProviderClientFactory.getClient(
                 config = request.config,
                 codexCredentialProvider = if (
@@ -203,15 +250,31 @@ internal class AgentRuntimeRunExecutor(
             val completedResponse = AgentModelClient.complete(
                 config = request.config,
                 provider = modelProvider,
+                sessionId = request.effectiveModelSessionId,
+                operationId = request.runId,
+                initialUserMessageId = uiPayload?.promptMessageId(request.runId) ?: "user-${request.runId}",
+                initialSupplementIndex = uiPayload?.lastSupplementIndex ?: 0,
+                roleplayContext = roleplayContext,
+                rewriteReply = request.operation == AgentRuntimeWire.OP_REWRITE_REPLY,
+                compactOnly = request.operation == AgentRuntimeWire.OP_COMPACT,
+                onContextSnapshot = { snapshot ->
+                    val committed = snapshot.copy(operationId = request.runId)
+                    AgentRunCheckpointStore.saveContext(appContext, request.runId, committed)
+                    session.updateContext(committed)
+                },
+                onTranscript = { transcript ->
+                    AgentRunCheckpointStore.saveTranscript(appContext, request.runId, transcript)
+                    session.updateTranscript(transcript)
+                },
                 capabilitiesProvider = { AgentToolCapabilities.capture(appContext) },
                 prompt = request.prompt,
-                toolExecutor = routingExecutor,
+                toolExecutor = runToolExecutor,
                 images = request.images,
                 history = request.history,
                 runController = runController,
                 skillContext = skillContext,
                 memoryContext = memoryContext,
-                additionalTools = mcpTools,
+                additionalTools = runTools,
             ) { event ->
                 timing.accept(event)
                 acceptEvent(
@@ -229,6 +292,9 @@ internal class AgentRuntimeRunExecutor(
                 content = completedResponse.content,
                 reasoningContent = completedResponse.reasoningContent,
                 transcript = completedResponse.transcript,
+                contextSnapshot = completedResponse.contextSnapshot?.copy(operationId = request.runId),
+                operation = request.operation,
+                rewriteTargetMessageId = request.rewriteTargetMessageId,
             )
         } catch (throwable: Throwable) {
             cancelled = runController.isCancelled || throwable is AgentRunCancelledException
@@ -271,20 +337,24 @@ internal class AgentRuntimeRunExecutor(
                 error = message,
                 reasoningContent = modelFailure?.reasoningContent.orEmpty(),
                 transcript = modelFailure?.transcript.orEmpty(),
+                contextSnapshot = modelFailure?.contextSnapshot?.copy(operationId = request.runId) ?: session.contextSnapshot,
+                operation = request.operation,
+                rewriteTargetMessageId = request.rewriteTargetMessageId,
             )
         } finally {
             runCatching { toolsBinding?.close() }
             runCatching { toolExecutor?.close() }
         }
 
-        if (cancelled) {
-            runCatching { checkpointRecorder?.discard() }.onFailure { throwable ->
+        if (cancelled && session.isTerminal) {
+            runCatching {
+                persistArtifacts(snapshotRequest(request), result, archivedEvents)
+            }.onFailure { throwable ->
                 AndroidAgentLogger.error(
-                    "Agent runtime cancelled checkpoint cleanup failed: " +
+                    "Agent runtime cancelled result persistence failed: " +
                         "type=${throwable.safeLogType()}"
                 )
             }
-            session.cancel("已停止")
             return Outcome(
                 result = result,
                 entrySurfaceGuard = entrySurfaceGuard,

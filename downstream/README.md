@@ -12,8 +12,11 @@
 - [v2.6.5.znmlr.1 发布核对记录](RELEASE_V2.6.5_ZNMLR_1_CHECKLIST.md)
 - [上游 v3.0.0 合并记录](UPSTREAM_V3.0.0_MERGE.md)
 - [上游 v3.0.2 合并记录](UPSTREAM_V3.0.2_MERGE.md)
+- [上游 v3.0.4 合并记录](UPSTREAM_V3.0.4_MERGE.md)
 
 当前发布版本为 [`v3.0.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.2.znmlr.1) / `2026090701`，基于上游 `v3.0.2`（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）。tag CI [34794064664](https://github.com/yangyunzhao/Eta/actions/runs/34794064664) 已通过完整单元测试、Lint、签名构建和 APK 校验；公开 Release APK SHA-256 为 `8DA68A5F1534806FE1700AAB006E1F2B7E96F10B1C99F47B3861918C76B44D0D`。用户已完成同证书覆盖安装及一般功能测试并反馈无问题。
+
+当前本地候选为上游 `v3.0.4`（`bc952e27169bf83dbef86380a54fc5b159e5609d`）对应的 `v3.0.4.znmlr.1` / `2026091202`。它尚未创建 tag 或 GitHub Release；签名候选 APK 的 CI 结果将记录在 [v3.0.4 合并记录](UPSTREAM_V3.0.4_MERGE.md)。
 
 Fork 继续保留上游未覆盖的 Codex OAuth 能力：设备码、AndroidKeyStore 加密凭据、刷新/登出、固定 Codex Responses/模型目录、Runtime 隔离、Room `auth_mode` 与 `ultra` 推理档位。`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 均为历史发布记录。
 

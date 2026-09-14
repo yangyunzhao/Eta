@@ -31,8 +31,8 @@ val codexOAuthEnabled = rawCodexOAuthBuildProperty
     }
     .orElse(true)
 
-val upstreamVersionName = "3.0.2"
-val upstreamVersionCode = 2_026_090_701
+val upstreamVersionName = "3.0.4"
+val upstreamVersionCode = 2_026_091_202
 val downstreamReleaseSequence = 1
 val downstreamVersionLabel = "znmlr"
 val downstreamVersionCodeMultiplier = 100

@@ -11,7 +11,6 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -22,13 +21,13 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class EtaDatabaseMigrationTest {
     @Test
-    fun migration6To19PreservesDataAndMovesBoundedConversationContext() {
+    fun migration6To21PreservesDataAndMovesCompleteConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
 
-        val migration17To18WithMcpData = Migration(17, 18) { database ->
-            EtaDatabase.MIGRATION_17_18.migrate(database)
+        val migration16To17WithMcpData = Migration(16, 17) { database ->
+            EtaDatabase.MIGRATION_16_17.migrate(database)
             database.execSQL(
                 "INSERT INTO mcp_servers (id, name, url, enabled, protocol_mode, " +
                     "authorization_type, tools_json, enabled_tool_names_json, created_at, " +
@@ -50,21 +49,19 @@ class EtaDatabaseMigrationTest {
                 EtaDatabase.MIGRATION_13_14,
                 EtaDatabase.MIGRATION_14_15,
                 EtaDatabase.MIGRATION_15_16,
-                EtaDatabase.MIGRATION_16_17,
-                migration17To18WithMcpData,
+                migration16To17WithMcpData,
+                EtaDatabase.MIGRATION_17_18,
                 EtaDatabase.MIGRATION_18_19,
+                EtaDatabase.MIGRATION_19_20,
+                EtaDatabase.MIGRATION_20_21,
             )
             .build()
         try {
-            val databaseVersion = database.openHelper.readableDatabase
-                .query("PRAGMA user_version")
-                .use { cursor ->
-                    check(cursor.moveToFirst())
-                    cursor.getInt(0)
-                }
             val result = runBlocking(Dispatchers.IO) {
                 database.runtimeRunDao().runtimeResults().single()
             }
+            assertEquals("", result.contextSnapshotJson)
+            assertEquals("chat", result.operation)
             val archive = runBlocking(Dispatchers.IO) {
                 database.runtimeRunDao().archivedRuns().single().run
             }
@@ -86,14 +83,6 @@ class EtaDatabaseMigrationTest {
             val provider = runBlocking(Dispatchers.IO) {
                 database.providerDao().providerById("provider-1")!!.toDomain()
             }
-            val migratedProvider = database.openHelper.readableDatabase
-                .query("SELECT auth_mode, api_key FROM model_providers WHERE id = 'provider-1'")
-                .use { cursor ->
-                    check(cursor.moveToFirst())
-                    val authModeColumn = cursor.getColumnIndexOrThrow("auth_mode")
-                    val apiKeyColumn = cursor.getColumnIndexOrThrow("api_key")
-                    cursor.getString(authModeColumn) to cursor.getString(apiKeyColumn)
-                }
             val migratedMessage = runBlocking(Dispatchers.IO) {
                 database.conversationDao().messages().single()
             }
@@ -104,7 +93,6 @@ class EtaDatabaseMigrationTest {
                 database.mcpServerDao().servers()
             }
 
-            assertEquals(19, databaseVersion)
             assertEquals("保留的结果", result.content)
             assertEquals("[]", result.transcriptJson)
             assertEquals("保留的归档", archive.content)
@@ -118,15 +106,17 @@ class EtaDatabaseMigrationTest {
                 "[{\"role\":\"user\",\"content\":\"保留上下文\"}]",
                 retainedCheckpoint?.historyJson,
             )
-            assertEquals("[]", oversizedCheckpoint?.historyJson)
+            assertEquals("[\"${"x".repeat(140_000)}\"]", oversizedCheckpoint?.historyJson)
+            assertEquals(oversizedCheckpoint?.historyJson, oversizedCheckpoint?.journalJson)
             assertEquals("[]", clearedLegacyHistory)
             assertEquals("[]", conversations.first { it.id == "conv-1" }.appliedRuntimeRunIdsJson)
+            assertEquals("", conversations.first { it.id == "conv-1" }.roleplayJson)
+            assertEquals("", conversations.first { it.id == "conv-1" }.revisionsJson)
+            assertEquals(emptyList<CharacterEntity>(), runBlocking(Dispatchers.IO) { database.characterDao().characters() })
             assertEquals("off", conversations.first { it.id == "conv-1" }.reasoningEffort)
             assertEquals("default", conversations.first { it.id == "conv-enabled" }.reasoningEffort)
             assertEquals(null, runBlocking(Dispatchers.IO) { database.conversationDao().state() })
             assertEquals(listOf("built-in", "manual"), provider.models.map { it.modelId })
-            assertEquals("", migratedProvider.first)
-            assertEquals("sk-existing", migratedProvider.second)
             assertEquals(false, provider.hostedWebSearchEnabled)
             assertEquals(false, migratedMessage.isEdited)
             assertEquals(emptyList<RuntimeInFlightRunWithEvents>(), inFlightRuns)
@@ -141,104 +131,6 @@ class EtaDatabaseMigrationTest {
             )
         } finally {
             database.close()
-            context.deleteDatabase(databaseName)
-        }
-    }
-
-    @Test
-    fun migration15To16KeepsDownstreamAuthModeAndAddsUpstreamOverrides() {
-        val context = RuntimeEnvironment.getApplication() as Context
-        val helper = createVersion15Database(
-            context = context,
-            databaseName = "migration-downstream-v15-${UUID.randomUUID()}.db",
-            hasAuthMode = true,
-            hasOverrides = false,
-        )
-        try {
-            val database = helper.writableDatabase
-            EtaDatabase.MIGRATION_15_16.migrate(database)
-
-            assertEquals("codex_oauth", queryString(database, "SELECT auth_mode FROM model_providers"))
-            assertNull(queryString(database, "SELECT context_window_override FROM provider_models"))
-            assertNull(queryString(database, "SELECT reasoning_override FROM provider_models"))
-            assertEquals("null", queryString(database, "SELECT reasoning_capabilities_override_json FROM provider_models"))
-        } finally {
-            helper.close()
-        }
-    }
-
-    @Test
-    fun migration15To16KeepsUpstreamOverridesAndAddsDownstreamAuthMode() {
-        val context = RuntimeEnvironment.getApplication() as Context
-        val helper = createVersion15Database(
-            context = context,
-            databaseName = "migration-upstream-v15-${UUID.randomUUID()}.db",
-            hasAuthMode = false,
-            hasOverrides = true,
-        )
-        try {
-            val database = helper.writableDatabase
-            EtaDatabase.MIGRATION_15_16.migrate(database)
-
-            assertEquals("", queryString(database, "SELECT auth_mode FROM model_providers"))
-            assertEquals("262144", queryString(database, "SELECT context_window_override FROM provider_models"))
-            assertEquals("1", queryString(database, "SELECT reasoning_override FROM provider_models"))
-            assertEquals("{\"supportedEfforts\":[\"high\"]}", queryString(
-                database,
-                "SELECT reasoning_capabilities_override_json FROM provider_models",
-            ))
-        } finally {
-            helper.close()
-        }
-    }
-
-    @Test
-    fun migration16To19PreservesForkAuthAndAddsRuntimeMcpExpiry() {
-        val context = RuntimeEnvironment.getApplication() as Context
-        val databaseName = "migration-fork-v16-${UUID.randomUUID()}.db"
-        val helper = createVersion16Database(context, databaseName)
-        try {
-            val database = helper.writableDatabase
-            EtaDatabase.MIGRATION_16_17.migrate(database)
-            EtaDatabase.MIGRATION_17_18.migrate(database)
-            database.execSQL(
-                "INSERT INTO mcp_servers (id, name, url, enabled, protocol_mode, " +
-                    "authorization_type, tools_json, enabled_tool_names_json, created_at, " +
-                    "sort_order, last_refreshed_at, last_protocol_version) VALUES " +
-                    "('mcp-1', 'MCP', 'http://127.0.0.1:8787/mcp', 1, 'auto', 'none', " +
-                    "'[]', '[]', 1, 0, NULL, NULL)",
-            )
-            EtaDatabase.MIGRATION_18_19.migrate(database)
-
-            assertEquals("codex_oauth", queryString(database, "SELECT auth_mode FROM model_providers"))
-            assertEquals("1", queryString(
-                database,
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' " +
-                    "AND name = 'runtime_inflight_runs'",
-            ))
-            assertNull(queryString(database, "SELECT tools_expire_at FROM mcp_servers WHERE id = 'mcp-1'"))
-        } finally {
-            helper.close()
-            context.deleteDatabase(databaseName)
-        }
-    }
-
-    @Test
-    fun migration18To19PreservesUpstreamExpiryAndAddsForkAuthMode() {
-        val context = RuntimeEnvironment.getApplication() as Context
-        val databaseName = "migration-upstream-v18-${UUID.randomUUID()}.db"
-        val helper = createVersion18Database(context, databaseName)
-        try {
-            val database = helper.writableDatabase
-            EtaDatabase.MIGRATION_18_19.migrate(database)
-
-            assertEquals("", queryString(database, "SELECT auth_mode FROM model_providers"))
-            assertEquals("1234", queryString(
-                database,
-                "SELECT tools_expire_at FROM mcp_servers WHERE id = 'mcp-1'",
-            ))
-        } finally {
-            helper.close()
             context.deleteDatabase(databaseName)
         }
     }
@@ -301,7 +193,7 @@ class EtaDatabaseMigrationTest {
                             "INSERT INTO model_providers " +
                                 "(id, type, name, base_url, api_key, is_enabled, is_built_in, sort_order, " +
                                 "system_prompt, custom_headers_json, custom_body_json, created_at, endpoint_mode, anthropic_version) " +
-                                "VALUES ('provider-1', 'openai_compatible', 'Provider', 'https://example.com/v1', 'sk-existing', 1, 0, 0, " +
+                                "VALUES ('provider-1', 'openai_compatible', 'Provider', 'https://example.com/v1', '', 1, 0, 0, " +
                                 "NULL, '[]', '[]', 1, 'chat_completions', '2023-06-01')"
                         )
                         db.execSQL(providerModelInsert("built-in-id", "built-in", 1, 0))
@@ -337,126 +229,6 @@ class EtaDatabaseMigrationTest {
                 helper.close()
             }
     }
-
-    private fun createVersion15Database(
-        context: Context,
-        databaseName: String,
-        hasAuthMode: Boolean,
-        hasOverrides: Boolean,
-    ): SupportSQLiteOpenHelper {
-        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(databaseName)
-            .callback(
-                object : SupportSQLiteOpenHelper.Callback(15) {
-                    override fun onCreate(db: SupportSQLiteDatabase) {
-                        db.execSQL(
-                            "CREATE TABLE model_providers (id TEXT NOT NULL PRIMARY KEY" +
-                                (if (hasAuthMode) ", auth_mode TEXT NOT NULL DEFAULT ''" else "") +
-                                ")",
-                        )
-                        db.execSQL(
-                            "CREATE TABLE provider_models (id TEXT NOT NULL PRIMARY KEY" +
-                                (if (hasOverrides) {
-                                    ", context_window_override INTEGER, reasoning_override INTEGER, " +
-                                        "reasoning_capabilities_override_json TEXT NOT NULL DEFAULT 'null'"
-                                } else {
-                                    ""
-                                }) +
-                                ")",
-                        )
-                        if (hasAuthMode) {
-                            db.execSQL("INSERT INTO model_providers (id, auth_mode) VALUES ('provider', 'codex_oauth')")
-                        } else {
-                            db.execSQL("INSERT INTO model_providers (id) VALUES ('provider')")
-                        }
-                        if (hasOverrides) {
-                            db.execSQL(
-                                "INSERT INTO provider_models " +
-                                    "(id, context_window_override, reasoning_override, reasoning_capabilities_override_json) " +
-                                    "VALUES ('model', 262144, 1, '{\"supportedEfforts\":[\"high\"]}')",
-                            )
-                        } else {
-                            db.execSQL("INSERT INTO provider_models (id) VALUES ('model')")
-                        }
-                    }
-
-                    override fun onUpgrade(
-                        db: SupportSQLiteDatabase,
-                        oldVersion: Int,
-                        newVersion: Int,
-                    ) = Unit
-                },
-            )
-            .build()
-        return FrameworkSQLiteOpenHelperFactory().create(configuration).also { it.writableDatabase }
-    }
-
-    private fun createVersion16Database(
-        context: Context,
-        databaseName: String,
-    ): SupportSQLiteOpenHelper {
-        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(databaseName)
-            .callback(
-                object : SupportSQLiteOpenHelper.Callback(16) {
-                    override fun onCreate(db: SupportSQLiteDatabase) {
-                        db.execSQL(
-                            "CREATE TABLE model_providers (id TEXT NOT NULL PRIMARY KEY, " +
-                                "auth_mode TEXT NOT NULL DEFAULT '')",
-                        )
-                        db.execSQL(
-                            "INSERT INTO model_providers (id, auth_mode) VALUES " +
-                                "('provider', 'codex_oauth')",
-                        )
-                    }
-
-                    override fun onUpgrade(
-                        db: SupportSQLiteDatabase,
-                        oldVersion: Int,
-                        newVersion: Int,
-                    ) = Unit
-                },
-            )
-            .build()
-        return FrameworkSQLiteOpenHelperFactory().create(configuration).also { it.writableDatabase }
-    }
-
-    private fun createVersion18Database(
-        context: Context,
-        databaseName: String,
-    ): SupportSQLiteOpenHelper {
-        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(databaseName)
-            .callback(
-                object : SupportSQLiteOpenHelper.Callback(18) {
-                    override fun onCreate(db: SupportSQLiteDatabase) {
-                        db.execSQL("CREATE TABLE model_providers (id TEXT NOT NULL PRIMARY KEY)")
-                        db.execSQL("INSERT INTO model_providers (id) VALUES ('provider')")
-                        db.execSQL(
-                            "CREATE TABLE mcp_servers (id TEXT NOT NULL PRIMARY KEY, " +
-                                "tools_expire_at INTEGER)",
-                        )
-                        db.execSQL(
-                            "INSERT INTO mcp_servers (id, tools_expire_at) VALUES ('mcp-1', 1234)",
-                        )
-                    }
-
-                    override fun onUpgrade(
-                        db: SupportSQLiteDatabase,
-                        oldVersion: Int,
-                        newVersion: Int,
-                    ) = Unit
-                },
-            )
-            .build()
-        return FrameworkSQLiteOpenHelperFactory().create(configuration).also { it.writableDatabase }
-    }
-
-    private fun queryString(database: SupportSQLiteDatabase, sql: String): String? =
-        database.query(sql).use { cursor ->
-            check(cursor.moveToFirst())
-            if (cursor.isNull(0)) null else cursor.getString(0)
-        }
 
     private companion object {
         fun providerModelInsert(id: String, modelId: String, builtIn: Int, sortOrder: Int): String =

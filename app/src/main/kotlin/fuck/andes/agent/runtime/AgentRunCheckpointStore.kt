@@ -1,6 +1,10 @@
 package fuck.andes.agent.runtime
 
 import android.content.Context
+import fuck.andes.agent.model.AgentContextSnapshot
+import fuck.andes.agent.model.AgentConversationCodec
+import fuck.andes.agent.model.AgentModelClient
+import fuck.andes.agent.model.AgentToolBatchRecovery
 import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.db.RuntimeInFlightEventEntity
 import fuck.andes.data.db.RuntimeInFlightRunEntity
@@ -8,10 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
 /**
- * 在途 UI run 的进程持久化日志。
- *
- * 它不保存 Provider 配置、API Key、工具调用参数增量或原始工具结果，只保存 UI 已可见的
- * 参数摘要、终端命令与结果摘要。
+ * 在途 run 的 UI 事件、完整脱敏 transcript 与模型上下文快照。
+ * 三者用途独立；配置和密钥不落盘，敏感工具原始数据由会话 codec 过滤。
  */
 internal object AgentRunCheckpointStore {
     data class Checkpoint(
@@ -21,6 +23,10 @@ internal object AgentRunCheckpointStore {
         val events: List<AgentEvent>,
         val createdAt: Long,
         val updatedAt: Long,
+        val contextSnapshot: AgentContextSnapshot? = null,
+        val operation: String = AgentRuntimeWire.OP_CHAT,
+        val transcript: List<AgentModelClient.ConversationMessage> = emptyList(),
+        val rewriteTargetMessageId: String? = null,
     )
 
     fun start(
@@ -37,6 +43,8 @@ internal object AgentRunCheckpointStore {
                 RuntimeInFlightRunEntity(
                     runId = runId,
                     ownerInstanceId = ownerInstanceId,
+                    operation = request.operation,
+                    rewriteTargetMessageId = request.rewriteTargetMessageId,
                     handoffId = handoff.id,
                     handoffSource = handoff.source,
                     handoffPayload = handoff.payload,
@@ -79,6 +87,10 @@ internal object AgentRunCheckpointStore {
                     Checkpoint(
                         runId = stored.run.runId,
                         ownerInstanceId = stored.run.ownerInstanceId,
+                        contextSnapshot = AgentContextSnapshot.decode(stored.run.contextSnapshotJson),
+                        operation = stored.run.operation,
+                        rewriteTargetMessageId = stored.run.rewriteTargetMessageId,
+                        transcript = AgentToolBatchRecovery.completeInterrupted(AgentConversationCodec.decodeTranscript(stored.run.transcriptJson)),
                         handoff = AgentRuntimeWire.EntryHandoff(
                             id = stored.run.handoffId,
                             source = stored.run.handoffSource,
@@ -95,6 +107,19 @@ internal object AgentRunCheckpointStore {
                 }
                 .toList()
         }
+
+    fun saveTranscript(context: Context, runId: String, transcript: List<AgentModelClient.ConversationMessage>) {
+        runBlocking(Dispatchers.IO) {
+            EtaDatabase.get(context.applicationContext).runtimeRunDao()
+                .updateTranscript(runId, AgentConversationCodec.encodeTranscriptForStorage(transcript))
+        }
+    }
+
+    fun saveContext(context: Context, runId: String, snapshot: AgentContextSnapshot) {
+        runBlocking(Dispatchers.IO) {
+            EtaDatabase.get(context.applicationContext).runtimeRunDao().updateContextSnapshot(runId, snapshot.encode())
+        }
+    }
 
     fun remove(context: Context, runId: String) {
         if (runId.isBlank()) return
