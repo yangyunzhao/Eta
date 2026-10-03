@@ -292,6 +292,8 @@ internal object ResponsesSseParser {
                 }
                 if (line.isBlank()) {
                     consumeFrame()
+                    // Responses 的终态帧结束本轮请求；服务端可能复用连接而不立刻关闭流。
+                    if (terminal != null) break
                 } else if (line.startsWith("data:")) {
                     dataLines += line.removePrefix("data:").trimStart()
                 }
@@ -499,16 +501,25 @@ internal object ResponsesSseParser {
                             content = partText,
                         )
                     }
-                    val reasoningText = item.optString("reasoning_text")
-                    appendSeparated(reasoning, reasoningText)
-                    if (reasoningText.isNotEmpty()) {
+                    val content = item.optJSONArray("content") ?: JSONArray()
+                    val reasoningParts = (0 until content.length()).mapNotNull { contentIndex ->
+                        val part = content.optJSONObject(contentIndex) ?: return@mapNotNull null
+                        if (part.optString("type") != "reasoning_text") return@mapNotNull null
+                        contentIndex to part.optString("text")
+                    }.ifEmpty {
+                        // 兼容旧接口的单字段形式；已有标准 content 时不再重复追加别名。
+                        item.optString("reasoning_text").takeIf { it.isNotEmpty() }
+                            ?.let { listOf(0 to it) }.orEmpty()
+                    }
+                    reasoningParts.forEach { (contentIndex, reasoningText) ->
+                        appendSeparated(reasoning, reasoningText)
                         contentParts += FinalContentPart(
                             kind = AssistantBlockKind.THINKING,
                             identity = ResponsesContentIdentity(
                                 family = RESPONSE_REASONING_FAMILY,
                                 itemId = itemId,
                                 outputIndex = index,
-                                partIndex = 0,
+                                partIndex = contentIndex,
                             ),
                             rawContent = reasoningText,
                             content = reasoningText,

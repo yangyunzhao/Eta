@@ -29,11 +29,11 @@ internal object OpenAiResponsesProvider : AgentProviderClient {
         runController: AgentRunController,
         onEvent: (ProviderEvent) -> Unit,
     ): ProviderResponse {
-        val config = request.config
+        val config = request.effectiveConfig
         require(config.openAiEndpointMode == OpenAiEndpointMode.RESPONSES) {
             "当前 Provider 未配置为 Responses API"
         }
-        val body = buildRequestJson(config, request.messages, request.tools)
+        val body = buildRequestJson(config, request.messages, request.effectiveTools)
             .toString()
             .toRequestBody(JSON_MEDIA_TYPE)
         val headers = okhttp3.Headers.Builder()
@@ -42,14 +42,14 @@ internal object OpenAiResponsesProvider : AgentProviderClient {
             .apply {
                 if (config.apiKey.isNotBlank()) add("Authorization", "Bearer ${config.apiKey}")
             }
-            .also { CustomHeaderFilter.mergeInto(it, config.customHeaders) }
+            .also { ProviderRequestHeaders.mergeInto(it, config.baseUrl, config.customHeaders, request.sessionId) }
             .build()
         val httpRequest = Request.Builder()
             .url(ProviderUrls.openAiResponsesUrl(config.baseUrl))
             .headers(headers)
             .post(body)
             .build()
-        val call = AgentHttpClient.client.newCall(httpRequest)
+        val call = AgentHttpClient.modelClient.newCall(httpRequest)
         val binding = runController.register(call::cancel)
 
         try {
@@ -59,7 +59,7 @@ internal object OpenAiResponsesProvider : AgentProviderClient {
                 onEvent(ProviderEvent.ResponseHeaders(response.code))
                 runController.throwIfCancelled()
                 if (!response.isSuccessful) {
-                    error("模型接口返回 HTTP ${response.code}：${response.body.string().compactError()}")
+                    throw AgentModelFailure.http(response.code, response.peekBody(16_384).string())
                 }
                 val assistant = ResponsesSseParser.parse(
                     stream = response.body.byteStream(),

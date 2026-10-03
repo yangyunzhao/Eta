@@ -13,7 +13,9 @@ class AgentToolRequirementsTest {
     @Test
     fun everyRegisteredToolHasExactlyOneRequirement() {
         val tools = catalog(root = true)
-        assertEquals(AgentToolRequirements.toolNames, tools.names())
+        val conversationScoped = setOf("conversation_history", "character_memory_get", "character_memory_write")
+        assertEquals(AgentToolRequirements.toolNames - conversationScoped, tools.names())
+        assertTrue(conversationScoped.all { AgentToolRequirements.find(it) != null })
         assertEquals(tools.length(), tools.names().size)
         assertFalse(tools.toString().contains("rootRequirement"))
     }
