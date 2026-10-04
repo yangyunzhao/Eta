@@ -48,8 +48,9 @@ gh secret set ETA_RELEASE_KEY_PASSWORD
 - 同一上游版本的下游序号从 `1` 开始递增；上游版本变化后重置为 `1`。
 - 上游版本基线必须来自已验证的上游 release tag 及其 peeled commit。
 - `versionCode` 必须在每次已发布构建之间严格单调递增，不得降低或复用。
-  当前构建脚本按 `上游 versionCode × 100 + 下游序号` 计算，因此下游序号必须在
-  `1..99` 内；发布前还要确认计算结果大于上一个已发布 APK 的 `versionCode`。
+  当前构建脚本按 `上游 versionCode + 下游序号 - 1` 计算，下游序号必须在
+  `1..99` 内；发布前还要确认计算结果大于上一个已发布 APK 的 `versionCode`，
+  且未与其他上游正式版本占用的代码冲突。
 
 正式发布前，在 `app/build.gradle.kts` 中更新上游版本、上游 `versionCode` 和下游序号，
 确认计算出的 `versionName` 后，再创建与 `v${versionName}` 严格一致的标签。

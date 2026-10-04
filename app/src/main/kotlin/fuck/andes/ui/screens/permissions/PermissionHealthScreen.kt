@@ -21,17 +21,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import fuck.andes.R
+import fuck.andes.ui.components.EtaArrowPreference
+import fuck.andes.ui.components.EtaPreferenceColors
+import fuck.andes.ui.components.EtaPreferenceDivider
+import fuck.andes.ui.components.EtaPreferenceGroup
+import fuck.andes.ui.components.EtaPreferenceGroupTitle
+import fuck.andes.ui.components.EtaPreferenceIcon
 import fuck.andes.ui.components.MiuixScaffoldPage
-import fuck.andes.ui.components.PreferenceIcon
 import fuck.andes.ui.components.color
 import fuck.andes.ui.components.label
 import fuck.andes.ui.model.PermissionHealthAction
 import fuck.andes.ui.model.PermissionHealthItemUi
 import fuck.andes.ui.model.PermissionHealthUiState
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -46,11 +48,12 @@ fun PermissionHealthScreen(
         modifier = modifier,
     ) {
         item(key = "title") {
-            SmallTitle(stringResource(R.string.ui_permissions_and_status_35f368))
+            EtaPreferenceGroupTitle(stringResource(R.string.ui_permissions_and_status_35f368))
         }
         item(key = "card") {
-            Card(modifier = Modifier.padding(horizontal = 12.dp)) {
-                state.items.forEach { item ->
+            EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
+                state.items.forEachIndexed { index, item ->
+                    if (index > 0) EtaPreferenceDivider()
                     PermissionItemRow(
                         item = item,
                         onActionClick = { onAction(PermissionHealthAction.OpenItemAction(item.id)) },
@@ -84,11 +87,11 @@ private fun PermissionItemRow(
         else -> Icons.Rounded.Shield
     }
 
-    ArrowPreference(
+    EtaArrowPreference(
         title = item.title,
         summary = item.summary.takeIf { it.isNotBlank() },
         startAction = {
-            PreferenceIcon(icon = icon)
+            EtaPreferenceIcon(icon = icon, tint = EtaPreferenceColors.Blue)
         },
         endActions = {
             Text(

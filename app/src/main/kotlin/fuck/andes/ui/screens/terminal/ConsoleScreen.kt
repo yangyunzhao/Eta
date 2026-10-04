@@ -60,11 +60,11 @@ import fuck.andes.agent.terminal.TerminalScreenBuffer
 import fuck.andes.ui.app.ConsoleStore
 import fuck.andes.ui.app.ConsoleUiState
 import fuck.andes.ui.app.UserTerminalStore
+import fuck.andes.ui.components.EtaTextButton
 import fuck.andes.ui.components.toSpanStyle
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 终端入口：块式终端为本体；PTY 可用时状态栏提供控制台模式切换。 */
@@ -242,7 +242,7 @@ private fun ConsoleStatusBar(
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
-            TextButton(
+            EtaTextButton(
                 text = stringResource(R.string.terminal_block_mode),
                 onClick = onExitConsole,
             )
@@ -350,13 +350,13 @@ private fun ColumnScope.ConsoleGrid(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center,
                 )
-                TextButton(
+                EtaTextButton(
                     text = stringResource(R.string.terminal_reconnect),
                     onClick = store::reconnect,
                     modifier = Modifier.padding(top = 12.dp),
                 )
                 if (state.failMessage != null) {
-                    TextButton(
+                    EtaTextButton(
                         text = stringResource(R.string.terminal_open_environment),
                         onClick = onOpenEnvironment,
                         modifier = Modifier.padding(top = 4.dp),

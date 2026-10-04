@@ -21,13 +21,13 @@ class AgentContextPersistenceTest {
     @Before fun setup() {
         context = RuntimeEnvironment.getApplication()
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        context.deleteDatabase("fuck_andes.db")
     }
 
     @After fun close() {
         AgentRunArchiveStore.remove(context, "context-persist")
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        context.deleteDatabase("fuck_andes.db")
     }
 
     @Test

@@ -1,15 +1,13 @@
 package fuck.andes.ui.pages.providers
-import fuck.andes.R
-import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,17 +19,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import fuck.andes.EtaApp
+import fuck.andes.R
+import fuck.andes.ui.components.EtaPreferenceRow
 import fuck.andes.data.model.ProviderSetting
 import fuck.andes.data.model.ProviderSourceTypes
 import fuck.andes.data.model.typeLabel
 import fuck.andes.data.repository.ProviderRepository
 import fuck.andes.data.repository.RuntimeConfigRepository
+import fuck.andes.ui.components.EtaArrowPreference
+import fuck.andes.ui.components.EtaOverlayDialog
 import fuck.andes.ui.components.MiuixDialogActions
 import fuck.andes.ui.components.MiuixScaffoldPage
 import fuck.andes.ui.navigation.AppRoute
@@ -41,8 +42,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -88,7 +87,13 @@ internal fun ModelProviderListScreen(
 
         item(key = "create_section") {
             ProviderSection(title = stringResource(R.string.ui_add_new_provider_74df54)) {
-                ArrowPreference(
+                EtaArrowPreference(
+                    title = "从目录添加",
+                    summary = "浏览可用提供商并选择模型",
+                    onClick = { onNavigate(AppRoute.CommunityCatalog) },
+                )
+
+                EtaArrowPreference(
                     title = stringResource(R.string.ui_added_openai_compatible_6bd471),
                     summary = stringResource(R.string.ui_support_chatgpt_deepseek_kimi_glm_qwen_etc_b31d02),
                     startAction = {
@@ -96,8 +101,8 @@ internal fun ModelProviderListScreen(
                     },
                     onClick = { onNavigate(AppRoute.ModelProviderNew(NewProviderType.OpenAiCompatible)) },
                 )
-                ProviderDivider()
-                ArrowPreference(
+
+                EtaArrowPreference(
                     title = stringResource(R.string.ui_new_anthropic_db6098),
                     summary = stringResource(R.string.ui_support_anthropic_claude_official_or_compatible_api_de3f80),
                     startAction = {
@@ -126,10 +131,7 @@ internal fun ModelProviderListScreen(
                         )
                     }
                 } else {
-                    filteredProviders.forEachIndexed { index, provider ->
-                        if (index > 0) {
-                            ProviderDivider()
-                        }
+                    filteredProviders.forEach { provider ->
                         ProviderListItem(
                             provider = provider,
                             isSelected = provider.id == selectedProviderId,
@@ -153,7 +155,7 @@ internal fun ModelProviderListScreen(
     }
 
     if (providerToDelete != null) {
-        OverlayDialog(
+        EtaOverlayDialog(
             show = true,
             title = stringResource(R.string.ui_remove_provider_9f848f),
             summary = stringResource(R.string.provider_delete_summary, providerToDelete?.name.orEmpty()),
@@ -187,19 +189,14 @@ private fun ProviderListItem(
     onSelect: () -> Unit,
 ) {
     val opacity = if (provider.isEnabled) 1f else 0.6f
-    Row(
+    EtaPreferenceRow(
+        title = null,
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onOpen,
-                onLongClick = onDelete
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .combinedClickable(onClick = onOpen, onLongClick = onDelete)
             .graphicsLayer { alpha = opacity },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ProviderIcon(provider)
-        Column(modifier = Modifier.weight(1f)) {
+        startAction = { ProviderIcon(provider) },
+        titleContent = {
             Text(
                 text = provider.name,
                 style = MiuixTheme.textStyles.headline1,
@@ -215,35 +212,37 @@ private fun ProviderListItem(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Text(
+                text = listOfNotNull(
+                    provider.typeLabel,
+                    pluralStringResource(R.plurals.provider_models_count, provider.models.size, provider.models.size),
+                    stringResource(R.string.ui_built_in_09ceea).takeIf { provider.isBuiltIn },
+                ).joinToString(" · "),
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(top = 6.dp),
-            ) {
-                TagChip(text = provider.typeLabel)
-                TagChip(text = pluralStringResource(R.plurals.provider_models_count, provider.models.size, provider.models.size))
-                if (provider.isBuiltIn) {
-                    TagChip(text = stringResource(R.string.ui_built_in_09ceea))
-                }
-                if (!provider.isEnabled) {
-                    TagChip(text = stringResource(R.string.ui_disabled_0fe5a9), tone = TagChipTone.Warning)
-                }
-                if (isSelected) {
-                    TagChip(text = stringResource(R.string.ui_current_25e74d), tone = TagChipTone.Emphasized)
-                }
-            }
-        }
-        IconButton(onClick = onSelect) {
-            Icon(
-                painter = painterResource(
-                    if (isSelected) LucideR.drawable.lucide_ic_check else LucideR.drawable.lucide_ic_circle,
-                ),
-                contentDescription = if (isSelected) {
-                    stringResource(R.string.provider_selected)
-                } else {
-                    stringResource(R.string.provider_set_current)
-                },
-                tint = if (isSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantActions,
             )
-        }
-    }
+            if (!provider.isEnabled) {
+                Text(
+                    text = stringResource(R.string.ui_disabled_0fe5a9),
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        },
+        endActions = {
+            IconButton(onClick = onSelect) {
+                Icon(
+                    imageVector = if (isSelected) Icons.Rounded.Check else Icons.Rounded.RadioButtonUnchecked,
+                    contentDescription = if (isSelected) {
+                        stringResource(R.string.provider_selected)
+                    } else {
+                        stringResource(R.string.provider_set_current)
+                    },
+                    tint = if (isSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantActions,
+                )
+            }
+        },
+    )
 }

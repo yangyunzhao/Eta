@@ -14,14 +14,16 @@ import androidx.compose.ui.unit.dp
 import fuck.andes.R
 import fuck.andes.agent.terminal.LinuxDistribution
 import fuck.andes.agent.terminal.LinuxExecutionBackend
-import top.yukonga.miuix.kmp.basic.BasicComponent
+import fuck.andes.ui.components.EtaCard
+import fuck.andes.ui.components.EtaPreference
+import fuck.andes.ui.components.EtaPreferenceDivider
+import fuck.andes.ui.components.EtaPreferenceGroup
+import fuck.andes.ui.components.EtaTextButton
+import fuck.andes.ui.components.EtaWindowSpinnerPreference
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -35,8 +37,8 @@ internal fun LinuxEnvironmentStatusCard(
     actionEnabled: Boolean,
     onAction: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+    EtaCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         insideMargin = PaddingValues(16.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -68,7 +70,7 @@ internal fun LinuxEnvironmentStatusCard(
                 )
             }
             actionText?.let {
-                TextButton(
+                EtaTextButton(
                     text = it,
                     enabled = actionEnabled,
                     onClick = onAction,
@@ -91,8 +93,8 @@ internal fun LinuxEnvironmentConfiguration(
 ) {
     val distributions = LinuxDistribution.entries
     val backends = listOf(LinuxExecutionBackend.PROOT, LinuxExecutionBackend.CHROOT)
-    Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-        WindowSpinnerPreference(
+    EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        EtaWindowSpinnerPreference(
             title = stringResource(R.string.linux_distribution_title),
             items = distributions.map {
                 DropdownItem(
@@ -110,7 +112,8 @@ internal fun LinuxEnvironmentConfiguration(
             onSelectedIndexChange = { onDistributionSelected(distributions[it]) },
         )
         if (rootGranted || backend == LinuxExecutionBackend.CHROOT) {
-            WindowSpinnerPreference(
+            EtaPreferenceDivider(hasLeading = false)
+            EtaWindowSpinnerPreference(
                 title = stringResource(R.string.capability_linux_backend),
                 items = backends.map {
                     DropdownItem(
@@ -129,7 +132,8 @@ internal fun LinuxEnvironmentConfiguration(
                 onSelectedIndexChange = { onBackendSelected(backends[it]) },
             )
         } else {
-            BasicComponent(
+            EtaPreferenceDivider(hasLeading = false)
+            EtaPreference(
                 title = stringResource(R.string.capability_linux_backend),
                 endActions = {
                     Text(

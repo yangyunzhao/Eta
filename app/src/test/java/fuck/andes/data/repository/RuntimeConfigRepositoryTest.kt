@@ -46,7 +46,7 @@ class RuntimeConfigRepositoryTest {
         )
 
         val config = RuntimeConfigRepository.buildRuntimeConfig(provider, model)
-        val raw = RuntimeConfigRepository.runtimeConfigJson(config)
+        val raw = RuntimeConfigRepository.runtimeConfigJson(config.copy(autoCompactionEnabled = false))
         val root = Json.parseToJsonElement(raw).jsonObject
 
         assertEquals(ProviderTypes.OPENAI_COMPATIBLE, root.getValue("providerType").jsonPrimitive.content)
@@ -63,7 +63,10 @@ class RuntimeConfigRepositoryTest {
             ),
             config.reasoningCapabilities?.selectableEfforts,
         )
-        assertEquals(config, Json.decodeFromString<AgentModelClient.ModelConfig>(raw))
+        assertEquals("false", root.getValue("autoCompactionEnabled").jsonPrimitive.content)
+        assertEquals(config.copy(autoCompactionEnabled = false), Json.decodeFromString<AgentModelClient.ModelConfig>(raw))
+        assertEquals(config.autoCompactionEnabled,
+            Json.decodeFromString<AgentModelClient.ModelConfig>(RuntimeConfigRepository.runtimeConfigJson(config)).autoCompactionEnabled)
     }
 
     @Test
@@ -110,7 +113,7 @@ class RuntimeConfigRepositoryTest {
 
         val config = RuntimeConfigRepository.buildRuntimeConfig(
             provider,
-            Model(id = "model", modelId = "gpt-5.5", displayName = "GPT-5.5"),
+            Model(id = "model", modelId = "gpt-5.5", displayName = "GPT-5.5", contextWindowOverride = 128_000),
         )
 
         assertEquals(OpenAiEndpointMode.RESPONSES, config.openAiEndpointMode)
@@ -151,6 +154,7 @@ class RuntimeConfigRepositoryTest {
         baseUrl = "https://api.openai.com/v1",
         apiKey = "",
         model = "gpt-5.5",
+        contextWindow = 128_000,
         systemPrompt = "system",
         openAiEndpointMode = OpenAiEndpointMode.RESPONSES,
         authMode = ProviderAuthModes.CODEX_OAUTH,

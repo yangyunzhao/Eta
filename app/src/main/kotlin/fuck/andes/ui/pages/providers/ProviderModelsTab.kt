@@ -1,8 +1,6 @@
 @file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
 
 package fuck.andes.ui.pages.providers
-import fuck.andes.R
-import androidx.compose.ui.res.stringResource
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -13,8 +11,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,14 +20,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,9 +43,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -52,8 +56,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
-import com.composables.icons.lucide.R as LucideR
 import fuck.andes.EtaApp
+import fuck.andes.R
 import fuck.andes.data.model.Model
 import fuck.andes.data.model.ModelReasoningCapabilities
 import fuck.andes.data.model.ProviderAuthModes
@@ -62,6 +66,18 @@ import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.data.repository.ModelRepository
 import fuck.andes.data.repository.RemoteModelFetcher
 import fuck.andes.data.repository.RuntimeConfigRepository
+import fuck.andes.ui.components.EtaArrowPreference
+import fuck.andes.ui.components.EtaCard
+import fuck.andes.ui.components.EtaCheckboxPreference
+import fuck.andes.ui.components.EtaOverlayDialog
+import fuck.andes.ui.components.EtaPreferenceColors
+import fuck.andes.ui.components.EtaPreferenceDivider
+import fuck.andes.ui.components.EtaPreferenceGroup
+import fuck.andes.ui.components.EtaPreferenceGroupItem
+import fuck.andes.ui.components.EtaPreferenceGroupTitle
+import fuck.andes.ui.components.EtaPreferenceIcon
+import fuck.andes.ui.components.EtaSwitchPreference
+import fuck.andes.ui.components.EtaTextButton
 import fuck.andes.ui.components.MiuixDialogActions
 import fuck.andes.ui.components.StatusError
 import fuck.andes.ui.components.StatusSuccess
@@ -70,25 +86,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
-import top.yukonga.miuix.kmp.preference.CheckboxPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.squircle.squircleSurface
-import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -105,12 +110,36 @@ internal val editableReasoningEfforts = listOf(
     ReasoningEffort.ULTRA,
 )
 
+private val modelDialogBodyMaxHeight = 520.dp
+private val modelDialogChromeHeight = 112.dp
+
+private fun Modifier.modelDialogScrollableBody(): Modifier = layout { measurable, constraints ->
+    // 从弹窗实际约束中为标题、间距和操作栏让出空间，避免横屏时底部按钮被内容挤出边界。
+    val fallbackMaxHeight = modelDialogBodyMaxHeight.roundToPx()
+    val reservedHeight = modelDialogChromeHeight.roundToPx()
+    val maxHeight = if (constraints.hasBoundedHeight) {
+        (constraints.maxHeight - reservedHeight)
+            .coerceAtLeast(1)
+            .coerceAtMost(fallbackMaxHeight)
+    } else {
+        fallbackMaxHeight
+    }
+    val placeable = measurable.measure(
+        constraints.copy(
+            minHeight = constraints.minHeight.coerceAtMost(maxHeight),
+            maxHeight = maxHeight,
+        ),
+    )
+    layout(placeable.width, placeable.height) {
+        placeable.place(0, 0)
+    }
+}
+
 internal fun contextWindowInputError(
     value: String,
     errorMessage: String = "Context window must be a positive integer",
 ): String? {
     val normalized = value.trim()
-    if (normalized.isEmpty()) return null
     return if (normalized.toIntOrNull()?.let { it > 0 } == true) {
         null
     } else {
@@ -197,14 +226,15 @@ internal fun ProviderModelsTab(
         ) {
             item(key = "actions", contentType = "section") {
                 ProviderSection(title = stringResource(R.string.ui_model_management_183414)) {
-                    ArrowPreference(
+                    EtaArrowPreference(
                         title = if (isFetching) context.getString(R.string.page_retrieving_a880c9) else context.getString(R.string.page_automatically_pull_from_remote_f883d0),
                         summary = stringResource(R.string.provider_models_endpoint_summary, provider.baseUrl),
                         enabled = !isFetching && !isMutatingModel,
                         startAction = {
-                            ProviderRoundIcon(
-                                icon = LucideR.drawable.lucide_ic_cloud_download,
-                                tint = MiuixTheme.colorScheme.primary,
+                            EtaPreferenceIcon(
+                                icon = Icons.Rounded.CloudDownload,
+                                enabled = !isFetching && !isMutatingModel,
+                                tint = EtaPreferenceColors.Blue,
                             )
                         },
                         onClick = {
@@ -263,15 +293,16 @@ internal fun ProviderModelsTab(
                             }
                         },
                     )
-                    ProviderDivider()
-                    ArrowPreference(
+
+                    EtaArrowPreference(
                         title = stringResource(R.string.ui_add_custom_model_a5ddc0),
                         summary = stringResource(R.string.ui_manually_fill_in_the_display_name_and_model_id_077a7b),
                         enabled = !isFetching && !isMutatingModel,
                         startAction = {
-                            ProviderRoundIcon(
-                                icon = LucideR.drawable.lucide_ic_plus,
-                                tint = MiuixTheme.colorScheme.primary,
+                            EtaPreferenceIcon(
+                                icon = Icons.Rounded.Add,
+                                enabled = !isFetching && !isMutatingModel,
+                                tint = EtaPreferenceColors.Blue,
                             )
                         },
                         onClick = {
@@ -285,7 +316,7 @@ internal fun ProviderModelsTab(
                         },
                     )
                     message?.let {
-                        HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                        EtaPreferenceDivider(hasLeading = false)
                         Text(
                             text = it,
                             style = MiuixTheme.textStyles.footnote2,
@@ -306,7 +337,7 @@ internal fun ProviderModelsTab(
                     label = stringResource(R.string.ui_search_model_df5586),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = 16.dp)
                         .padding(top = 12.dp, bottom = 8.dp),
                 )
             }
@@ -344,14 +375,14 @@ internal fun ProviderModelsTab(
                 }
             } else {
                 item(key = "models_title", contentType = "section_title") {
-                    SmallTitle(modelListTitle)
+                    EtaPreferenceGroupTitle(modelListTitle)
                 }
                 itemsIndexed(
                     items = filteredModels,
                     key = { _, model -> "model:${model.id}" },
                     contentType = { _, _ -> "model" },
                 ) { index, model ->
-                    ModelListGroupItem(
+                    EtaPreferenceGroupItem(
                         isFirst = index == 0,
                         isLast = index == filteredModels.lastIndex,
                     ) {
@@ -465,7 +496,7 @@ internal fun ProviderModelsTab(
     }
 
     modelPendingDelete?.let { model ->
-        OverlayDialog(
+        EtaOverlayDialog(
             show = true,
             title = stringResource(R.string.ui_delete_model_cf24da),
             summary = stringResource(R.string.provider_model_delete_summary, model.displayName),
@@ -503,7 +534,7 @@ internal fun ProviderModelsTab(
     }
 
     if (showBatchDeleteDialog) {
-        OverlayDialog(
+        EtaOverlayDialog(
             show = true,
             title = stringResource(R.string.ui_delete_model_cf24da),
             summary = pluralStringResource(
@@ -552,42 +583,6 @@ internal fun ProviderModelsTab(
     }
 }
 
-@Composable
-private fun ModelListGroupItem(
-    isFirst: Boolean,
-    isLast: Boolean,
-    content: @Composable () -> Unit,
-) {
-    val surfaceColor = MiuixTheme.colorScheme.surfaceContainer
-    val contentColor = MiuixTheme.colorScheme.onSurfaceContainer
-    val cornerRadius = CardDefaults.CornerRadius
-    val surfaceModifier = if (isFirst || isLast) {
-        Modifier.squircleSurface(
-            color = surfaceColor,
-            topStart = if (isFirst) cornerRadius else 0.dp,
-            topEnd = if (isFirst) cornerRadius else 0.dp,
-            bottomEnd = if (isLast) cornerRadius else 0.dp,
-            bottomStart = if (isLast) cornerRadius else 0.dp,
-        )
-    } else {
-        Modifier.background(surfaceColor)
-    }
-
-    CompositionLocalProvider(LocalContentColor provides contentColor) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .then(surfaceModifier),
-        ) {
-            content()
-            if (!isLast) {
-                HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
-            }
-        }
-    }
-}
-
 /** 多选模式底部悬浮操作栏：退出在左，已选数量其次，全选与删除在右；删除沿用统一破坏性配色。 */
 @Composable
 private fun ModelSelectionBar(
@@ -599,12 +594,12 @@ private fun ModelSelectionBar(
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
-    Card(
+    EtaCard(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp),
     ) {
         Row(
             modifier = Modifier
@@ -615,7 +610,7 @@ private fun ModelSelectionBar(
         ) {
             IconButton(onClick = onExit, enabled = enabled) {
                 Icon(
-                    painter = painterResource(LucideR.drawable.lucide_ic_x),
+                    imageVector = Icons.Rounded.Close,
                     contentDescription = stringResource(R.string.ui_exit_multiple_selection_c194fd),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
                 )
@@ -629,12 +624,12 @@ private fun ModelSelectionBar(
                 style = MiuixTheme.textStyles.body2,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(
+            EtaTextButton(
                 text = if (selectedCount == totalCount) context.getString(R.string.page_select_none_ba20eb) else context.getString(R.string.page_select_all_3e44b2),
                 enabled = enabled,
                 onClick = onToggleAll,
             )
-            TextButton(
+            EtaTextButton(
                 text = stringResource(R.string.ui_delete_3755f5),
                 enabled = selectedCount > 0 && enabled,
                 colors = ButtonDefaults.textButtonColorsPrimary(
@@ -712,17 +707,15 @@ private fun ModelListItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onEdit, enabled = enabled) {
                     Icon(
-                        painter = painterResource(LucideR.drawable.lucide_ic_sliders_horizontal),
+                        imageVector = Icons.Rounded.Tune,
                         contentDescription = stringResource(R.string.ui_edit_model_parameters_ba4864),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
                     )
                 }
                 IconButton(onClick = onSetCurrent, enabled = enabled) {
                     Icon(
-                        painter = painterResource(
-                            if (isSelected) LucideR.drawable.lucide_ic_check
-                            else LucideR.drawable.lucide_ic_circle
-                        ),
+                        imageVector = if (isSelected) Icons.Rounded.Check
+                            else Icons.Rounded.RadioButtonUnchecked,
                         contentDescription = if (isSelected) context.getString(R.string.page_current_model_a0af8f) else context.getString(R.string.page_set_as_current_model_183d7d),
                         tint = if (isSelected) {
                             MiuixTheme.colorScheme.primary
@@ -768,10 +761,7 @@ private fun ModelEditDialog(
                 .orEmpty() + ReasoningEffort.DEFAULT
         )
     }
-    val contextError = contextWindowInputError(
-        contextWindowOverrideText,
-        context.getString(R.string.page_the_context_length_must_be_a_positive_integer_06ca7a),
-    )
+    val contextError = contextWindowInputError(contextWindowOverrideText)
 
     fun resetAutomaticReasoning() {
         reasoningOverrideActive = false
@@ -807,7 +797,7 @@ private fun ModelEditDialog(
         },
     )
 
-    OverlayDialog(
+    EtaOverlayDialog(
         show = true,
         title = if (isNew) context.getString(R.string.page_add_model_532a64) else context.getString(R.string.page_edit_model_29e31e),
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -816,7 +806,7 @@ private fun ModelEditDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 520.dp)
+                    .modelDialogScrollableBody()
                     .scrollEndHaptic()
                     .verticalScroll(rememberScrollState()),
             ) {
@@ -852,47 +842,9 @@ private fun ModelEditDialog(
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = when {
-                            contextWindowOverrideText.isNotBlank() -> context.getString(R.string.page_overwritten_will_take_precedence_over_remote_metadat_59934d)
-                            model.contextWindow != null ->
-                                stringResource(
-                                    R.string.provider_auto_context,
-                                    formatCompactTokenCount(model.contextWindow),
-                                )
-                            else -> context.getString(R.string.page_automatic_no_context_cap_was_provided_by_the_remote__db027f)
-                        },
-                        style = MiuixTheme.textStyles.footnote2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (contextWindowOverrideText.isNotBlank()) {
-                        TextButton(
-                            text = stringResource(R.string.ui_restore_automatic_8d4e1e),
-                            enabled = !isSaving,
-                            onClick = { contextWindowOverrideText = "" },
-                        )
-                    }
-                }
-                contextError?.let { validationError ->
-                    Text(
-                        text = validationError,
-                        style = MiuixTheme.textStyles.footnote2,
-                        color = StatusError,
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.ui_this_value_is_used_for_session_clipping_and_context__c3f9e7),
-                    style = MiuixTheme.textStyles.footnote2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
-                )
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    SwitchPreference(
+                Spacer(modifier = Modifier.height(12.dp))
+                EtaPreferenceGroup(modifier = Modifier.fillMaxWidth()) {
+                    EtaSwitchPreference(
                         checked = reasoningEnabled,
                         onCheckedChange = { enabled ->
                             reasoningOverrideActive = true
@@ -913,8 +865,8 @@ private fun ModelEditDialog(
                         enabled = !isSaving,
                     )
                     if (reasoningEnabled) {
-                        HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
-                        CheckboxPreference(
+                        EtaPreferenceDivider(hasLeading = false)
+                        EtaCheckboxPreference(
                             title = ReasoningEffort.DEFAULT.displayName,
                             summary = stringResource(R.string.ui_determined_by_model_or_provider_06c326),
                             checked = true,
@@ -923,8 +875,8 @@ private fun ModelEditDialog(
                             enabled = false,
                         )
                         editableReasoningEfforts.forEach { effort ->
-                            HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
-                            CheckboxPreference(
+                            EtaPreferenceDivider(hasLeading = false)
+                            EtaCheckboxPreference(
                                 title = effort.displayName,
                                 summary = if (effort == ReasoningEffort.OFF) {
                                     context.getString(R.string.page_allow_thinking_to_be_turned_off_during_conversations_5a32a9)

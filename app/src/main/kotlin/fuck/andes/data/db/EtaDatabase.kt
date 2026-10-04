@@ -123,6 +123,15 @@ internal abstract class EtaDatabase : RoomDatabase() {
         }
 
         internal val MIGRATION_18_19 = Migration(18, 19) { database ->
+            // v18 曾由上游与下游两条 schema 路径发布；各自补齐另一侧已有的列。
+            addColumnIfMissing(
+                database, "model_providers", "auth_mode",
+                "ALTER TABLE model_providers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT ''",
+            )
+            addColumnIfMissing(
+                database, "mcp_servers", "tools_expire_at",
+                "ALTER TABLE mcp_servers ADD COLUMN tools_expire_at INTEGER",
+            )
             listOf("runtime_results", "runtime_archive_runs", "runtime_inflight_runs").forEach { table ->
                 database.execSQL("ALTER TABLE $table ADD COLUMN context_snapshot_json TEXT NOT NULL DEFAULT ''")
                 database.execSQL("ALTER TABLE $table ADD COLUMN operation TEXT NOT NULL DEFAULT 'chat'")

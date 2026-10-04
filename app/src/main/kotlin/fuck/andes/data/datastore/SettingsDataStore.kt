@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import fuck.andes.data.model.AppearanceAccentColor
@@ -15,7 +16,9 @@ import fuck.andes.data.model.AppearancePaletteStyle
 import fuck.andes.data.model.AppearanceSettings
 import fuck.andes.data.model.AppearanceThemeMode
 import fuck.andes.data.model.AppearanceTopBarBlurStyle
+import fuck.andes.data.model.SpeechSettings
 import fuck.andes.data.model.Settings
+import kotlinx.serialization.json.Json
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -23,10 +26,29 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 internal object SettingsDataStore {
+    private val SPEECH_SETTINGS = stringPreferencesKey("speech_settings_v1")
+    private val speechJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    fun speechSettingsFlow(): Flow<SpeechSettings> {
+        ensureInitialized()
+        return dataStore.data.map { prefs ->
+            prefs[SPEECH_SETTINGS]?.let { speechJson.decodeFromString<SpeechSettings>(it) }
+                ?: SpeechSettings()
+        }
+    }
+
+    suspend fun speechSettings() = speechSettingsFlow().first()
+
+    suspend fun setSpeechSettings(settings: SpeechSettings) {
+        ensureInitialized()
+        dataStore.edit { it[SPEECH_SETTINGS] = speechJson.encodeToString(settings) }
+    }
+
     private const val STORE_NAME = "eta_settings"
 
     private val SELECTED_PROVIDER_ID = stringPreferencesKey("selected_provider_id")
     private val SELECTED_MODEL_ID = stringPreferencesKey("selected_model_id")
+    private val OFFICIAL_MODEL_CATALOG_REVISION = intPreferencesKey("official_model_catalog_revision")
     private val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
     private val LINUX_DISTRIBUTION = stringPreferencesKey("linux_distribution")
     private val APPEARANCE_THEME_MODE = stringPreferencesKey("appearance_theme_mode")
@@ -68,6 +90,18 @@ internal object SettingsDataStore {
     }
 
     suspend fun settings(): Settings = settingsFlow().first()
+
+    suspend fun officialModelCatalogRevision(): Int {
+        ensureInitialized()
+        return dataStore.data.first()[OFFICIAL_MODEL_CATALOG_REVISION] ?: 0
+    }
+
+    suspend fun setOfficialModelCatalogRevision(revision: Int) {
+        ensureInitialized()
+        dataStore.edit { preferences ->
+            preferences[OFFICIAL_MODEL_CATALOG_REVISION] = revision
+        }
+    }
 
     suspend fun updateSettings(transform: (Settings) -> Settings) {
         ensureInitialized()

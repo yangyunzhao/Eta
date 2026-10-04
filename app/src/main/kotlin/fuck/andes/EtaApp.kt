@@ -1,5 +1,6 @@
 package fuck.andes
 
+import fuck.andes.agent.voice.SpeechOssUpload
 import android.app.Application
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +17,7 @@ import fuck.andes.data.model.CodexOAuthFeaturePolicy
 import fuck.andes.data.datastore.SettingsDataStore
 import fuck.andes.data.repository.AgentMemoryRepository
 import fuck.andes.data.repository.AppearanceSettingsRepository
+import fuck.andes.data.repository.LinuxEnvironmentSettingsRepository
 import fuck.andes.data.repository.McpServerRepository
 import fuck.andes.data.repository.ProviderRepository
 import fuck.andes.ui.app.PredictiveBackController
@@ -70,6 +72,15 @@ class EtaApp : Application(), XposedServiceHelper.OnServiceListener {
         McpServerRepository.init(this)
         XposedServiceHelper.registerListener(this)
         applicationScope.launch {
+            try {
+                SpeechOssUpload(this@EtaApp).retryPending(this@EtaApp)
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                AndroidAgentLogger.warn("Eta speech cleanup unavailable: type=${error.javaClass.simpleName}")
+            }
+        }
+        applicationScope.launch {
+            LinuxEnvironmentSettingsRepository.initialize(this@EtaApp)
             runCatching {
                 SkillRuntime.createIndexService(this@EtaApp).listInstalledSkills()
             }.onFailure { throwable ->

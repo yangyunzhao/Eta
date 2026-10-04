@@ -25,24 +25,29 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import fuck.andes.R
 import fuck.andes.ui.app.WorkspaceEntry
 import fuck.andes.ui.app.WorkspaceFileStore
+import fuck.andes.ui.components.EtaArrowPreference
+import fuck.andes.ui.components.EtaCard
+import fuck.andes.ui.components.EtaPreference
+import fuck.andes.ui.components.EtaPreferenceColors
+import fuck.andes.ui.components.EtaPreferenceDivider
+import fuck.andes.ui.components.EtaPreferenceGroup
+import fuck.andes.ui.components.EtaPreferenceGroupTitle
+import fuck.andes.ui.components.EtaPreferenceIcon
 import fuck.andes.ui.components.ListEmptyState
 import fuck.andes.ui.components.MiuixScaffoldPage
-import fuck.andes.ui.components.PreferenceIcon
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 @Composable
 internal fun WorkspaceScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val store = remember(context.applicationContext) { WorkspaceFileStore(context) }
     val scope = rememberCoroutineScope()
     var path by rememberSaveable { mutableStateOf("") }
@@ -61,14 +66,14 @@ internal fun WorkspaceScreen(onBack: () -> Unit) {
             try {
                 var succeeded = 0
                 uris.forEach { if (store.importFile(it)) succeeded++ }
-                message = if (succeeded == uris.size) context.getString(R.string.capability_workspace_imported)
-                else context.getString(R.string.capability_workspace_partial_import, succeeded)
+                message = if (succeeded == uris.size) resources.getString(R.string.capability_workspace_imported)
+                else resources.getQuantityString(R.plurals.capability_workspace_partial_import, succeeded, succeeded)
                 if (succeeded > 0) path = "imports"
                 revision++
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                message = context.getString(R.string.capability_workspace_failed)
+                message = resources.getString(R.string.capability_workspace_failed)
             } finally {
                 busy = false
             }
@@ -81,11 +86,11 @@ internal fun WorkspaceScreen(onBack: () -> Unit) {
             busy = true
             try {
                 store.exportFile(source, uri)
-                message = context.getString(R.string.capability_workspace_exported)
+                message = resources.getString(R.string.capability_workspace_exported)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                message = context.getString(R.string.capability_workspace_failed)
+                message = resources.getString(R.string.capability_workspace_failed)
             } finally {
                 busy = false
             }
@@ -98,51 +103,52 @@ internal fun WorkspaceScreen(onBack: () -> Unit) {
             throw cancelled
         } catch (_: Exception) {
             entries = emptyList()
-            message = context.getString(R.string.capability_workspace_failed)
+            message = resources.getString(R.string.capability_workspace_failed)
         }
     }
     MiuixScaffoldPage(title = stringResource(R.string.capability_workspace), onBack = onBack) {
         item(key = "workspace-info") {
-            BasicComponent(
+            EtaPreference(
                 title = stringResource(R.string.capability_workspace_private),
                 summary = stringResource(R.string.capability_workspace_private_summary),
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
         }
         item(key = "actions") {
-            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                ArrowPreference(
+            EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                EtaArrowPreference(
                     title = stringResource(R.string.capability_workspace_import),
                     enabled = !busy,
-                    startAction = { PreferenceIcon(Icons.Rounded.DriveFolderUpload, enabled = !busy) },
+                    startAction = { EtaPreferenceIcon(Icons.Rounded.DriveFolderUpload, enabled = !busy, tint = EtaPreferenceColors.Orange) },
                     onClick = { importLauncher.launch(arrayOf("*/*")) },
                 )
 
-                ArrowPreference(
+                EtaPreferenceDivider(hasLeading = true)
+                EtaArrowPreference(
                     title = stringResource(R.string.capability_workspace_public),
-                    startAction = { PreferenceIcon(Icons.Rounded.FolderOpen) },
+                    startAction = { EtaPreferenceIcon(Icons.Rounded.FolderOpen, tint = EtaPreferenceColors.Orange) },
                     summary = if (publicAccess) stringResource(R.string.capability_workspace_public_granted) else stringResource(R.string.capability_workspace_public_summary),
                     onClick = {
                         try {
                             accessLauncher.launch(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                                 Uri.parse("package:${context.packageName}")))
                         } catch (_: android.content.ActivityNotFoundException) {
-                            message = context.getString(R.string.capability_workspace_failed)
+                            message = resources.getString(R.string.capability_workspace_failed)
                         }
                     },
                 )
             }
         }
-        message?.let { text -> item(key = "message") { BasicComponent(title = text) } }
+        message?.let { text -> item(key = "message") { EtaPreference(title = text) } }
         item(key = "path") {
-            SmallTitle(if (path.isBlank()) stringResource(R.string.capability_workspace_files) else path)
+            EtaPreferenceGroupTitle(if (path.isBlank()) stringResource(R.string.capability_workspace_files) else path)
         }
         if (path.isNotBlank()) {
             item(key = "parent") {
-                Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                    ArrowPreference(
+                EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    EtaArrowPreference(
                         title = stringResource(R.string.capability_workspace_parent),
-                        startAction = { PreferenceIcon(Icons.Rounded.FolderOpen) },
+                        startAction = { EtaPreferenceIcon(Icons.Rounded.FolderOpen, tint = EtaPreferenceColors.Orange) },
                         onClick = { path = path.substringBeforeLast('/', "") },
                     )
                 }
@@ -157,8 +163,8 @@ internal fun WorkspaceScreen(onBack: () -> Unit) {
             }
         }
         items(entries, key = { it.path }) { entry ->
-            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                ArrowPreference(
+            EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                EtaArrowPreference(
                     title = entry.name,
                     summary = if (entry.directory) stringResource(R.string.capability_workspace_directory)
                         else stringResource(
@@ -166,9 +172,10 @@ internal fun WorkspaceScreen(onBack: () -> Unit) {
                             Formatter.formatShortFileSize(context, entry.size),
                         ),
                     startAction = {
-                        PreferenceIcon(
+                        EtaPreferenceIcon(
                             icon = if (entry.directory) Icons.Rounded.Folder else Icons.AutoMirrored.Rounded.InsertDriveFile,
                             enabled = !busy,
+                            tint = EtaPreferenceColors.Orange,
                         )
                     },
                     enabled = !busy,

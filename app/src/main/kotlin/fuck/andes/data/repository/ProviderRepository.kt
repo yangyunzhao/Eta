@@ -10,8 +10,11 @@ import fuck.andes.data.db.toModelEntities
 import fuck.andes.data.model.AnthropicProviderSetting
 import fuck.andes.data.model.CustomProviderSetting
 import fuck.andes.data.model.Model
+import fuck.andes.data.model.ModelReasoningCapabilities
+import fuck.andes.data.model.ModelSource
 import fuck.andes.data.model.OpenAiCompatibleProviderSetting
 import fuck.andes.data.model.ProviderSetting
+import fuck.andes.data.model.ReasoningEffort
 import fuck.andes.data.model.Settings
 import fuck.andes.data.model.selectedOrFirstModel
 import fuck.andes.data.model.withApiKey
@@ -23,15 +26,17 @@ import fuck.andes.data.provider.OfficialModelCatalog
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal object ProviderRepository {
+    private val builtInMergeMutex = Mutex()
+
     @Volatile
     private lateinit var applicationContext: Context
 
     fun init(context: Context) {
-        if (!::applicationContext.isInitialized) {
-            applicationContext = context.applicationContext
-        }
+        applicationContext = context.applicationContext
     }
 
     fun providersFlow(): Flow<List<ProviderSetting>> =
@@ -118,22 +123,35 @@ internal object ProviderRepository {
         repairSelection()
     }
 
-    suspend fun ensureBuiltInsMerged() {
+    suspend fun ensureBuiltInsMerged(): Unit = builtInMergeMutex.withLock {
         val current = allProviders()
         if (current.isEmpty()) {
             insertProviders(BuiltinProviders.PROVIDERS.map(::seedOfficialModelsIfEmpty))
+            SettingsDataStore.setOfficialModelCatalogRevision(OfficialModelCatalog.CURRENT_REVISION)
             repairSelection()
-            return
+            return@withLock
         }
 
         val existingIds = current.mapTo(mutableSetOf()) { it.id }
         val missing = BuiltinProviders.PROVIDERS.filterNot { it.id in existingIds }
         if (missing.isNotEmpty()) {
             insertProviders(missing.map(::seedOfficialModelsIfEmpty))
-            repairSelection()
-        } else {
-            repairSelection()
         }
+        val appliedRevision = SettingsDataStore.officialModelCatalogRevision()
+        if (appliedRevision < OfficialModelCatalog.CURRENT_REVISION) {
+            current.filter { it.isBuiltIn && BuiltinProviders.providerById(it.id) != null }.forEach { provider ->
+                val additions = OfficialModelCatalog.modelsAddedSince(provider, appliedRevision)
+                dao().appendModelsIfAbsent(
+                    providerId = provider.id,
+                    candidates = provider.withModels(additions).toModelEntities(),
+                )
+                if (appliedRevision < 1) {
+                    refreshLegacyCatalogReasoningCapabilities(provider)
+                }
+            }
+            SettingsDataStore.setOfficialModelCatalogRevision(OfficialModelCatalog.CURRENT_REVISION)
+        }
+        repairSelection()
     }
 
     suspend fun repairSelection(): Settings {
@@ -191,6 +209,67 @@ internal object ProviderRepository {
         if (provider.models.isNotEmpty()) return provider
         val seededModels = OfficialModelCatalog.modelsForProvider(provider)
         return if (seededModels.isEmpty()) provider else provider.withModels(seededModels)
+    }
+
+    private suspend fun refreshLegacyCatalogReasoningCapabilities(provider: ProviderSetting) {
+        val legacyCapabilities = when (provider.id) {
+            BuiltinProviders.OPENAI_ID -> listOf(
+                "gpt-5.6-sol",
+                "gpt-5.6-terra",
+                "gpt-5.6-luna",
+                "gpt-5.5",
+            ).associateWith {
+                ModelReasoningCapabilities(
+                    supportedEfforts = listOf(
+                        ReasoningEffort.MINIMAL,
+                        ReasoningEffort.LOW,
+                        ReasoningEffort.MEDIUM,
+                        ReasoningEffort.HIGH,
+                        ReasoningEffort.XHIGH,
+                    ),
+                    defaultEffort = ReasoningEffort.MEDIUM,
+                    defaultEnabled = true,
+                    canDisable = true,
+                )
+            }
+            BuiltinProviders.ANTHROPIC_ID -> mapOf("claude-fable-5" to ModelReasoningCapabilities(
+                supportedEfforts = listOf(
+                    ReasoningEffort.LOW,
+                    ReasoningEffort.MEDIUM,
+                    ReasoningEffort.HIGH,
+                    ReasoningEffort.XHIGH,
+                    ReasoningEffort.MAX,
+                ),
+                defaultEffort = ReasoningEffort.HIGH,
+                defaultEnabled = true,
+                canDisable = true,
+            ))
+            BuiltinProviders.STEPFUN_ID -> mapOf("step-3.7-flash" to ModelReasoningCapabilities(
+                defaultEnabled = true,
+                mandatory = true,
+            ))
+            else -> return
+        }
+        val updatedJsonByModelId = provider.withModels(OfficialModelCatalog.modelsForProvider(provider))
+            .toModelEntities()
+            .associate { it.modelId to it.reasoningCapabilitiesJson }
+        val storedRowsById = dao().models(provider.id).associateBy { it.id }
+        provider.models.forEach { storedModel ->
+            val previousCapabilities = legacyCapabilities[storedModel.modelId] ?: return@forEach
+            if (storedModel.source != ModelSource.CATALOG ||
+                storedModel.reasoningCapabilities != previousCapabilities
+            ) return@forEach
+            val updatedJson = updatedJsonByModelId[storedModel.modelId] ?: return@forEach
+            val storedRow = storedRowsById[storedModel.id] ?: return@forEach
+            if (updatedJson == storedRow.reasoningCapabilitiesJson) return@forEach
+            dao().updateCatalogReasoningCapabilitiesIfUnchanged(
+                providerId = provider.id,
+                modelId = storedModel.id,
+                apiModelId = storedModel.modelId,
+                previousJson = storedRow.reasoningCapabilitiesJson,
+                updatedJson = updatedJson,
+            )
+        }
     }
 
     private fun ProviderSetting.deepCopy(

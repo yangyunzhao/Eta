@@ -1,6 +1,8 @@
 package fuck.andes.agent.tool
 
+import fuck.andes.agent.model.AgentConversationToolCatalog
 import fuck.andes.agent.model.AgentToolCatalog
+import fuck.andes.agent.roleplay.CharacterMemoryTools
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -12,12 +14,18 @@ import org.junit.Test
 class AgentToolRequirementsTest {
     @Test
     fun everyRegisteredToolHasExactlyOneRequirement() {
-        val tools = catalog(root = true)
-        val conversationScoped = setOf("conversation_history", "character_memory_get", "character_memory_write")
-        assertEquals(AgentToolRequirements.toolNames - conversationScoped, tools.names())
-        assertTrue(conversationScoped.all { AgentToolRequirements.find(it) != null })
+        val tools = catalog(root = true).also {
+            CharacterMemoryTools.appendSchemas(it)
+            it.put(AgentConversationToolCatalog.schema())
+        }
+        assertEquals(AgentToolRequirements.toolNames, tools.names())
         assertEquals(tools.length(), tools.names().size)
         assertFalse(tools.toString().contains("rootRequirement"))
+    }
+
+    @Test
+    fun ordinaryCatalogDoesNotExposeCharacterMemoryTools() {
+        assertTrue(catalog(root = true).names().none { it in CharacterMemoryTools.NAMES })
     }
 
     @Test

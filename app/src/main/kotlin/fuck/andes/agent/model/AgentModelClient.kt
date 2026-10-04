@@ -52,6 +52,7 @@ internal object AgentModelClient {
                         Prefs.isEnabled(Prefs.Keys.AGENT_DEVICE_SENSITIVE_ACTION_TOOLS),
                     thinkingEnabled = effort.enablesReasoning,
                     reasoningEffort = effort,
+                    autoCompactionEnabled = Prefs.isEnabled(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
                 )
             }
         }
@@ -69,6 +70,7 @@ internal object AgentModelClient {
             model = "gpt-5.5",
             modelDisplayName = "GPT-5.5",
             systemPrompt = BuiltinProviders.DEFAULT_SYSTEM_PROMPT,
+            autoCompactionEnabled = Prefs.isEnabled(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
             terminalTools = Prefs.isEnabled(Prefs.Keys.AGENT_TERMINAL_TOOLS),
             browserTools = Prefs.isEnabled(Prefs.Keys.AGENT_BROWSER_TOOLS),
             deviceDirectTools = Prefs.isEnabled(Prefs.Keys.AGENT_DEVICE_DIRECT_TOOLS),
@@ -102,6 +104,7 @@ internal object AgentModelClient {
         initialSupplementIndex: Int = 0,
         roleplayContext: RoleplayRunContext? = null,
         rewriteReply: Boolean = false,
+        assistantScreenContext: String = "",
         onContextSnapshot: (AgentContextSnapshot) -> Unit = {},
         onTranscript: (List<ConversationMessage>) -> Unit = {},
         onEvent: (AgentEvent) -> Unit = {}
@@ -126,6 +129,7 @@ internal object AgentModelClient {
             ))
         } else if (!compactOnly) {
             messages.getJSONObject(messages.length() - 1).put("_eta_message_id", initialUserMessageId)
+            AssistantScreenContextProjection.attach(messages.getJSONObject(messages.length() - 1), assistantScreenContext)
         }
         if (compactOnly) messages.remove(messages.length() - 1)
         val transcript = JSONArray()
@@ -262,6 +266,7 @@ internal object AgentModelClient {
         val customHeaders: List<CustomHeader> = emptyList(),
         val customBody: List<CustomBody> = emptyList(),
         val authMode: String = "",
+        val autoCompactionEnabled: Boolean = Prefs.Keys.BOOLEAN_DEFAULTS.getValue(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
     ) {
         val effectiveReasoningEffort: ReasoningEffort
             get() = reasoningEffort ?: ReasoningEffort.fromLegacy(thinkingEnabled)
@@ -293,6 +298,7 @@ internal object AgentModelClient {
 
                 else -> throw IllegalArgumentException("不支持的认证模式")
             }
+            requireContextWindow()
             require(
                 reasoningCapabilities?.mandatory != true ||
                     effectiveReasoningEffort != ReasoningEffort.OFF
@@ -301,9 +307,15 @@ internal object AgentModelClient {
                 runCatching { JSONObject(extraBodyJson) }
                     .getOrElse { throwable ->
                         error("额外请求体 JSON 无效：${throwable.message ?: throwable.javaClass.simpleName}")
-                    }
+                }
             }
         }
+
+        fun requireContextWindow(): Int = contextWindow?.takeIf { it > 0 }
+            ?: throw AgentModelFailure(
+                "CONTEXT_WINDOW_REQUIRED", false,
+                "请先到设置 → 模型提供商，填写当前模型「${modelDisplayName.ifBlank { model }}」的上下文窗口大小（tokens）。",
+            )
     }
 
     @Serializable
@@ -347,7 +359,9 @@ internal object AgentModelClient {
         val bytes: Int,
         val width: Int? = null,
         val height: Int? = null,
-        val source: String = "unknown"
+        val source: String = "unknown",
+        /** 截图已具有可上传编码，跨进程物化时保留字节，不走附件转码。 */
+        val preserveOriginal: Boolean = false,
     )
 
     sealed interface ModelResponse {

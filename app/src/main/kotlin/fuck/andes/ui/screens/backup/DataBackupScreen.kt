@@ -24,6 +24,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import fuck.andes.R
 import fuck.andes.data.repository.EtaBackupSummary
+import fuck.andes.ui.components.EtaArrowPreference
+import fuck.andes.ui.components.EtaCard
+import fuck.andes.ui.components.EtaPreference
+import fuck.andes.ui.components.EtaPreferenceDivider
+import fuck.andes.ui.components.EtaPreferenceGroup
+import fuck.andes.ui.components.EtaPreferenceGroupTitle
+import fuck.andes.ui.components.EtaWindowDialog
 import fuck.andes.ui.components.MiuixDialogActions
 import fuck.andes.ui.components.MiuixScaffoldPage
 import java.io.InputStream
@@ -33,14 +40,9 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 internal fun DataBackupScreen(
@@ -104,19 +106,19 @@ internal fun DataBackupScreen(
         onBack = onBack,
     ) {
         item(key = "warning") {
-            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                BasicComponent(
+            EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                EtaPreference(
                     title = stringResource(R.string.data_backup_warning_title),
                     summary = stringResource(R.string.data_backup_warning_summary),
                 )
             }
         }
         item(key = "actions-title") {
-            SmallTitle(stringResource(R.string.data_backup_actions))
+            EtaPreferenceGroupTitle(stringResource(R.string.data_backup_actions))
         }
         item(key = "actions-card") {
-            Card(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)) {
-                ArrowPreference(
+            EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+                EtaArrowPreference(
                     title = stringResource(R.string.data_backup_export),
                     summary = if (busy) {
                         stringResource(R.string.data_backup_working)
@@ -134,7 +136,8 @@ internal fun DataBackupScreen(
                         exportLauncher.launch(defaultBackupFileName())
                     },
                 )
-                ArrowPreference(
+                EtaPreferenceDivider(hasLeading = true)
+                EtaArrowPreference(
                     title = stringResource(R.string.data_backup_import),
                     summary = stringResource(R.string.data_backup_import_summary),
                     enabled = !busy,
@@ -153,7 +156,7 @@ internal fun DataBackupScreen(
     }
 
     if (showImportDialog) {
-        WindowDialog(
+        EtaWindowDialog(
             show = true,
             title = stringResource(R.string.data_backup_import_confirm_title),
             summary = stringResource(R.string.data_backup_import_confirm_summary),

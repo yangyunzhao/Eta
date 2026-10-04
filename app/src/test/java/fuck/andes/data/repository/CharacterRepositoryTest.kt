@@ -23,7 +23,7 @@ class CharacterRepositoryTest {
     @Before
     fun setUp() {
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        context.deleteDatabase("fuck_andes.db")
         context.getSharedPreferences("eta_roleplay", 0).edit().clear().commit()
         CharacterRepository.initialize(context)
     }

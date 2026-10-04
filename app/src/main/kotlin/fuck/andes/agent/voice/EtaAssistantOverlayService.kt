@@ -1,16 +1,26 @@
 package fuck.andes.agent.voice
 
-import android.app.Service
+import fuck.andes.data.model.TtsProvider
+import fuck.andes.data.repository.SpeechSettingsRepository
+import fuck.andes.ui.voice.openSpeechSettings
+import fuck.andes.ui.voice.SpeechPlaybackErrors
+import fuck.andes.ui.voice.LocalSpeechPlayback
+import android.os.PowerManager
+import android.Manifest
 import android.app.ActivityOptions
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.speech.SpeechRecognizer
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -21,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -34,8 +45,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import fuck.andes.agent.accessibility.AgentAccessibilityService
-import fuck.andes.agent.media.AgentImageCodec
+import fuck.andes.R
 import fuck.andes.agent.model.AgentModelClient
 import fuck.andes.agent.overlay.AgentOverlayVisibilityPolicy
 import fuck.andes.agent.runtime.AgentEvent
@@ -43,18 +53,19 @@ import fuck.andes.agent.runtime.AgentExternalArchivePayload
 import fuck.andes.agent.runtime.AgentRuntimeClient
 import fuck.andes.agent.runtime.AgentRuntimeWire
 import fuck.andes.core.AndroidAgentLogger
-import fuck.andes.ui.MainActivity
-import fuck.andes.ui.app.AgentAppTheme
 import fuck.andes.data.model.AppearanceSettings
 import fuck.andes.data.repository.AppearanceSettingsRepository
+import fuck.andes.ui.MainActivity
+import fuck.andes.ui.app.AgentAppTheme
+import fuck.andes.ui.app.AgentRunEventCoalescer
 import fuck.andes.ui.app.AgentRunMessageProjector
 import fuck.andes.ui.model.AgentChatMessageUi
 import fuck.andes.ui.model.AgentMessageUi
-import fuck.andes.ui.model.ThinkingMessageUi
 import fuck.andes.ui.model.SystemNoticeCode
 import fuck.andes.ui.model.SystemNoticeMessageUi
-import fuck.andes.ui.model.ToolActivityMessageUi
+import fuck.andes.ui.model.ThinkingMessageUi
 import fuck.andes.ui.model.TokenUsageUi
+import fuck.andes.ui.model.ToolActivityMessageUi
 import fuck.andes.ui.model.UserMessageUi
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -66,15 +77,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
 
 /**
  * Eta 数字助理的用户界面窗口。
  *
- * 系统助理会话只负责承接电源键入口；这里固定使用全屏 TYPE_APPLICATION_OVERLAY，
+ * 系统助理会话承接电源键入口并采集上下文；这里固定使用全屏 TYPE_APPLICATION_OVERLAY，
  * 让输入法、动画和厂商助手式浮窗拥有同一个窗口生命周期。
  */
 internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
@@ -86,6 +97,27 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     }
     private val runtimeClient = AgentRuntimeClient(this, AndroidAgentLogger)
     private val runMessageProjector = AgentRunMessageProjector()
+    private val eventCoalescer = AgentRunEventCoalescer()
+    private var deltaFlushJob: Job? = null
+    private var speechLevel by mutableFloatStateOf(0f)
+    private var speechState by mutableStateOf(EtaSpeechState())
+    private val speechForeground by lazy { AssistantSpeechForeground(this) }
+    private val playback by lazy {
+        SpeechPlaybackController(this, scope, beforePlayback = speechForeground::playback, afterPlayback = speechForeground::stop)
+    }
+    private val speechInput by lazy {
+        SpeechInputController(
+            context = this,
+            scope = scope,
+            automaticEndpoint = true,
+            beforeCapture = speechForeground::recording,
+            afterCapture = speechForeground::stop,
+            onResult = { text ->
+                speechState = EtaSpeechState()
+                submitPromptInternal(text, fromSpeech = true)
+            },
+        )
+    }
     private val conversationKey = "eta_assistant_${UUID.randomUUID()}"
     private var conversationHistory = emptyList<AgentModelClient.ConversationMessage>()
 
@@ -97,13 +129,13 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     private var backInvokedDispatcher: OnBackInvokedDispatcher? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
     private var runJob: Job? = null
-    private var entryCaptureJob: Job? = null
+    private var dismissalJob: Job? = null
     private var activeRunId: String? = null
     private var entryGeneration = 0L
     private var presentedEntryGeneration = -1L
-    private var screenContextAttachment: EtaScreenContextAttachment? = null
+    private var entryScreenContext: EtaAssistantScreenContext? = null
     private var hiddenForForegroundOperation = false
-    private var handoffInProgress = false
+    private var handoffInProgress by mutableStateOf(false)
     private var handoffExitRequested by mutableStateOf(false)
     private var inputText by mutableStateOf("")
     private var inputFocusRequestKey by mutableIntStateOf(-1)
@@ -120,13 +152,29 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        scope.launch(Dispatchers.Main.immediate) {
+            speechInput.state.collect { state ->
+                speechLevel = state.level
+                if (state.preview.isNotBlank()) inputText = state.preview
+                speechState = EtaSpeechState(
+                    phase = state.phase,
+                    // 连接、聆听、识别中的阶段播报由语音条目与波形承担，反馈条只保留
+                    // 错误和空闲态的模型下载消息，避免与语音界面重复叙事。
+                    message = state.error ?: state.progress.takeIf { it.isNotBlank() && state.phase == EtaSpeechPhase.IDLE },
+                    downloadAvailable = state.downloadAvailable,
+                    configureAvailable = state.error != null && !state.downloadAvailable,
+                    feedbackIsError = state.error != null,
+                )
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_SHOW -> showEntry()
+            AssistantSpeechForeground.ACTION_STOP -> { speechInput.cancel(); playback.stop() }
+            ACTION_SHOW -> showEntry(intent.getStringExtra(EXTRA_SCREEN_CONTEXT_ID))
             ACTION_HANDOFF_READY -> finishHandoff()
-            else -> showEntry()
+            else -> Unit
         }
         return START_NOT_STICKY
     }
@@ -135,9 +183,8 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
 
     override fun onDestroy() {
         entryGeneration++
-        entryCaptureJob?.cancel()
-        entryCaptureJob = null
-        screenContextAttachment = null
+        EtaAssistantScreenContexts.release(entryScreenContext?.id)
+        entryScreenContext = null
         cancelCurrentRun()
         removeWindow()
         scope.cancel()
@@ -147,92 +194,31 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         super.onDestroy()
     }
 
-    private fun showEntry() {
+    private fun showEntry(screenContextId: String?) {
         if (!Settings.canDrawOverlays(this)) {
+            EtaAssistantScreenContexts.release(screenContextId)
             AndroidAgentLogger.warnThrottled("eta_assistant_overlay_permission_missing") {
                 "Eta assistant overlay permission is missing"
             }
             stopSelf()
             return
         }
+        dismissalJob?.cancel()
+        dismissalJob = null
         cancelCurrentRun()
-        entryCaptureJob?.cancel()
+        if (entryScreenContext?.id != screenContextId) {
+            EtaAssistantScreenContexts.release(entryScreenContext?.id)
+            entryScreenContext = EtaAssistantScreenContexts.find(screenContextId)
+        }
         removeWindow()
         val generation = ++entryGeneration
         presentedEntryGeneration = -1L
-        screenContextAttachment = null
         inputText = ""
-        uiState = EtaVoiceUiState(
-            screenContext = EtaScreenContextUiState(
-                phase = EtaScreenContextPhase.CAPTURING,
-            ),
-        )
+        uiState = EtaVoiceUiState()
         hiddenForForegroundOperation = false
         handoffInProgress = false
         handoffExitRequested = false
-        val accessibility = AgentAccessibilityService.current()
-        if (accessibility == null) {
-            uiState = uiState.copy(
-                screenContext = EtaScreenContextUiState(
-                    phase = EtaScreenContextPhase.UNAVAILABLE,
-                ),
-            )
-            presentEntry(generation)
-            return
-        }
-        entryCaptureJob = scope.launch {
-            val result = accessibility.captureScreenshotExcludingOverlays(
-                onWindowsSubmitted = {
-                    scope.launch(Dispatchers.Main.immediate) {
-                        presentEntry(generation)
-                    }
-                },
-            )
-            val bitmap = result.bitmap
-            val attachment = if (bitmap == null || result.criticalWindowMissing) {
-                null
-            } else {
-                try {
-                    runCatching {
-                        val image = AgentImageCodec.fromScreenContextBitmap(
-                            bitmap,
-                            source = "screen_context",
-                        )
-                        val preview = AgentImageCodec.previewFromReference(
-                            this@EtaAssistantOverlayService,
-                            image,
-                        ) ?: return@runCatching null
-                        EtaScreenContextAttachment(
-                            image = image,
-                            previewDataUrl = preview.reference,
-                        )
-                    }.onFailure { throwable ->
-                        AndroidAgentLogger.warn(
-                            "Eta assistant entry screenshot encode failed: " +
-                                "type=${throwable.javaClass.simpleName}"
-                        )
-                    }.getOrNull()
-                } finally {
-                    if (!bitmap.isRecycled) bitmap.recycle()
-                }
-            }
-            withContext(Dispatchers.Main.immediate) {
-                if (generation != entryGeneration) return@withContext
-                entryCaptureJob = null
-                screenContextAttachment = attachment
-                uiState = uiState.copy(
-                    screenContext = if (attachment == null) {
-                        EtaScreenContextUiState(phase = EtaScreenContextPhase.UNAVAILABLE)
-                    } else {
-                        EtaScreenContextUiState(
-                            phase = EtaScreenContextPhase.AVAILABLE,
-                            previewDataUrl = attachment.previewDataUrl,
-                        )
-                    },
-                )
-                presentEntry(generation)
-            }
-        }
+        presentEntry(generation)
     }
 
     private fun presentEntry(generation: Long) {
@@ -243,6 +229,43 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             stopSelf()
             return
         }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startSpeech()
+        } else {
+            speechState = EtaSpeechState(errorRes = R.string.voice_audio_permission)
+            showKeyboard()
+        }
+    }
+
+    private fun startSpeech() {
+        if (activeRunId != null) return
+        playback.stop()
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                dismissAndStop()
+            } catch (_: RuntimeException) {
+                speechState = EtaSpeechState(errorRes = R.string.voice_audio_permission)
+            }
+            return
+        }
+        inputFocusRequestKey = -1
+        inputText = ""
+        updateSoftInput(visible = false)
+        windowView?.let { view ->
+            (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)
+                ?.hideSoftInputFromWindow(view.windowToken, 0)
+            view.clearFocus()
+        }
+        speechLevel = 0f
+        speechState = EtaSpeechState(phase = EtaSpeechPhase.STARTING)
+        speechInput.start()
+    }
+
+    private fun switchToKeyboard() {
+        speechInput.cancel()
+        speechState = EtaSpeechState()
         showKeyboard()
     }
 
@@ -258,14 +281,25 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             ) {
                 // ColorOS 在 Overlay 窗口切换期间可能短暂使用软件画布；RuntimeShader
                 // 无法在该画布绘制，因此浮窗统一使用 Miuix 的圆角回退路径。
-                CompositionLocalProvider(LocalSquircleEnabled provides false) {
+                CompositionLocalProvider(LocalSquircleEnabled provides false,
+                    LocalSpeechPlayback provides playback) {
+                    SpeechPlaybackErrors(playback)
                     EtaVoicePanel(
                         state = uiState,
+                        speech = speechState,
+                        speechLevel = { speechLevel },
+                        onMicrophone = ::startSpeech,
+                        onFinishSpeech = { speechInput.finish() },
+                        onDownloadModel = { speechInput.downloadModel() },
+                        onOpenSpeechSettings = {
+                            openSpeechSettings(this)
+                            dismissAndStop()
+                        },
+                        onKeyboard = ::switchToKeyboard,
                         input = inputText,
                         inputFocusRequestKey = inputFocusRequestKey,
                         onInputChange = { inputText = it },
-                        onScreenContextSelect = ::selectScreenContext,
-                        onScreenContextRemove = ::removeScreenContext,
+                        onSuggestionClick = ::submitPrompt,
                         onSubmit = ::submitInput,
                         onStop = ::stopCurrentRun,
                         onClose = ::dismissAndStop,
@@ -273,6 +307,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                             uiState.messages.any { message ->
                                 message is AgentMessageUi && message.content.isNotBlank()
                             },
+                        handoffRunning = handoffInProgress,
                         exitRequested = handoffExitRequested,
                         onOpenConversation = ::openConversation,
                     )
@@ -299,10 +334,6 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
             title = "EtaAssistantOverlay"
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && wm.isCrossWindowBlurEnabled) {
-                flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-                blurBehindRadius = 24
-            }
         }
         runCatching { wm.addView(view, params) }.onFailure { throwable ->
             AndroidAgentLogger.warnThrottled("eta_assistant_overlay_add_failed") {
@@ -368,28 +399,31 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         submitPrompt(prompt)
     }
 
-    private fun submitPrompt(prompt: String) {
+    private fun submitPrompt(prompt: String) = submitPromptInternal(prompt, fromSpeech = false)
+
+    private fun submitPromptInternal(prompt: String, fromSpeech: Boolean) {
         val normalized = prompt.trim()
         if (normalized.isBlank() || activeRunId != null) return
-        val attachment = screenContextAttachment.takeIf { uiState.screenContext.selected }
-        val runImages = attachment?.let { listOf(it.image) }.orEmpty()
-        val previewImages = attachment?.let { listOf(it.previewDataUrl) }.orEmpty()
-        screenContextAttachment = null
+        speechInput.cancel()
+        speechState = EtaSpeechState()
+        playback.stop()
+        val capture = entryScreenContext
         inputText = ""
         activeRunId = UUID.randomUUID().toString()
         val runId = activeRunId ?: return
         uiState = uiState.copy(
             phase = EtaVoicePhase.PROCESSING,
             status = EtaVoiceStatus.Reasoning,
-            screenContext = EtaScreenContextStateReducer.consume(),
             messages = uiState.messages + UserMessageUi(
                 id = "user-$runId",
                 content = normalized,
-                images = previewImages,
             ),
         )
         updateSoftInput(visible = false)
         runJob = scope.launch {
+            val speechConfig = if (fromSpeech) SpeechSettingsRepository.settings() else null
+            val screen = capture?.snapshot() ?: EtaAssistantScreenContext.Snapshot()
+            val runImages = listOfNotNull(screen.image)
             val config = AgentModelClient.loadConfig()
             val payload = AgentExternalArchivePayload(
                 userText = normalized,
@@ -400,6 +434,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                 request = AgentRuntimeWire.RunRequest(
                     runId = runId,
                     prompt = normalized,
+                    assistantScreenContext = screen.text,
                     config = config,
                     images = runImages,
                     history = conversationHistory,
@@ -414,6 +449,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             )
             val shouldStopAfterResult = withContext(Dispatchers.Main.immediate) {
                 if (activeRunId != runId) return@withContext false
+                flushPendingDelta(runId)
                 activeRunId = null
                 runJob = null
                 if (result.contextSnapshot != null) {
@@ -434,6 +470,12 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                         status = EtaVoiceStatus.Failed(result.error),
                         messages = finishRunMessages(runId, result),
                     )
+                }
+                if (!hiddenForForegroundOperation && windowView?.isShown == true && result.ok &&
+                    getSystemService(PowerManager::class.java).isInteractive &&
+                    speechConfig?.autoSpeak == true && speechConfig.tts != TtsProvider.NONE) {
+                    val messageId = uiState.messages.filterIsInstance<AgentMessageUi>().lastOrNull()?.id ?: runId
+                    playback.speak(messageId, result.content, settings = speechConfig)
                 }
                 if (!hiddenForForegroundOperation) {
                     updateSoftInput(visible = false)
@@ -458,6 +500,29 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             if (AgentOverlayVisibilityPolicy.shouldDismissEntrySurfaceFor(event)) {
                 hideForForegroundOperation()
             }
+            if (event is AgentEvent.AssistantBlockDelta) {
+                if (event.kind == AgentEvent.AssistantBlockKind.TOOL_CALL || event.delta.isEmpty()) return@launch
+                eventCoalescer.append(runId, event)?.let { ready ->
+                    uiState = projectRuntimeEvent(runId, ready, uiState)
+                }
+                if (deltaFlushJob?.isActive != true) {
+                    deltaFlushJob = scope.launch(Dispatchers.Main.immediate) {
+                        delay(50)
+                        deltaFlushJob = null
+                        if (activeRunId == runId) flushPendingDelta(runId)
+                    }
+                }
+            } else {
+                flushPendingDelta(runId)
+                uiState = projectRuntimeEvent(runId, event, uiState)
+            }
+        }
+    }
+
+    private fun flushPendingDelta(runId: String) {
+        deltaFlushJob?.cancel()
+        deltaFlushJob = null
+        eventCoalescer.flush(runId)?.let { event ->
             uiState = projectRuntimeEvent(runId, event, uiState)
         }
     }
@@ -724,6 +789,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     private fun stopCurrentRun() {
         val runId = activeRunId
         if (runId != null) {
+            flushPendingDelta(runId)
             activeRunId = null
             requestRuntimeCancellation(runId)
             runJob?.cancel()
@@ -748,7 +814,11 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     }
 
     private fun cancelCurrentRun() {
+        playback.stop()
+        speechInput.cancel()
+        speechState = EtaSpeechState()
         val runId = activeRunId ?: return
+        flushPendingDelta(runId)
         activeRunId = null
         requestRuntimeCancellation(runId)
         runJob?.cancel()
@@ -774,25 +844,6 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         runCatching { wm.updateViewLayout(view, params) }
     }
 
-    private fun selectScreenContext() {
-        uiState = uiState.copy(
-            screenContext = EtaScreenContextStateReducer.select(
-                state = uiState.screenContext,
-                enabled = activeRunId == null,
-                hasAttachment = screenContextAttachment != null,
-            ),
-        )
-    }
-
-    private fun removeScreenContext() {
-        uiState = uiState.copy(
-            screenContext = EtaScreenContextStateReducer.remove(
-                state = uiState.screenContext,
-                enabled = activeRunId == null,
-            ),
-        )
-    }
-
     private fun hideForForegroundOperation(onComplete: ((Boolean) -> Unit)? = null) {
         hiddenForForegroundOperation = true
         EtaVoiceInteractionSession.requestHideForForegroundOperation(this)
@@ -800,6 +851,9 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     }
 
     private fun removeWindow(onComplete: ((Boolean) -> Unit)? = null) {
+        playback.stop()
+        speechInput.cancel()
+        speechState = EtaSpeechState()
         unregisterSystemBackCallback()
         detachingWindowView?.let { detachingView ->
             onComplete?.let(windowDetachCallbacks::add)
@@ -835,6 +889,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)
                 ?.hideSoftInputFromWindow(view.windowToken, 0)
             wm.removeView(view)
+            view.disposeComposition()
             true
         }.getOrElse { throwable ->
             view.removeOnAttachStateChangeListener(attachListener)
@@ -865,13 +920,17 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     }
 
     private fun dismissAndStop() {
+        if (dismissalJob?.isActive == true) return
         entryGeneration++
-        entryCaptureJob?.cancel()
-        entryCaptureJob = null
-        screenContextAttachment = null
+        EtaAssistantScreenContexts.release(entryScreenContext?.id)
+        entryScreenContext = null
         cancelCurrentRun()
-        removeWindow()
-        stopSelf()
+        handoffExitRequested = true
+        dismissalJob = scope.launch(Dispatchers.Main.immediate) {
+            delay(HANDOFF_EXIT_DURATION_MS)
+            removeWindow()
+            stopSelf()
+        }
     }
 
     private fun openConversation() {
@@ -941,6 +1000,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         const val ACTION_SHOW = "fuck.andes.agent.voice.SHOW"
         const val ACTION_OPEN_CONVERSATION = "fuck.andes.agent.voice.OPEN_CONVERSATION"
         const val EXTRA_CONVERSATION_KEY = "fuck.andes.agent.voice.extra.CONVERSATION_KEY"
+        private const val EXTRA_SCREEN_CONTEXT_ID = "assistant_screen_context_id"
         private const val ACTION_HANDOFF_READY = "fuck.andes.agent.voice.HANDOFF_READY"
         private const val HANDOFF_TIMEOUT_MS = 5_000L
         private const val HANDOFF_EXIT_DURATION_MS = 220L
@@ -995,10 +1055,11 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             }
         }
 
-        fun show(context: Context) {
+        fun show(context: Context, screenContextId: String?) {
             context.applicationContext.startService(
                 Intent(context.applicationContext, EtaAssistantOverlayService::class.java)
-                    .setAction(ACTION_SHOW),
+                    .setAction(ACTION_SHOW)
+                    .putExtra(EXTRA_SCREEN_CONTEXT_ID, screenContextId),
             )
         }
 
@@ -1016,8 +1077,3 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         }
     }
 }
-
-private data class EtaScreenContextAttachment(
-    val image: AgentModelClient.ModelImage,
-    val previewDataUrl: String,
-)

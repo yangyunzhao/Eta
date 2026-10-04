@@ -1,11 +1,9 @@
 package fuck.andes.ui.screens.tools
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
@@ -18,12 +16,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fuck.andes.R
 import fuck.andes.agent.tool.AgentToolCapabilities
 import fuck.andes.agent.tool.RootRequirement
+import fuck.andes.ui.components.EtaFeatureCard
+import fuck.andes.ui.components.EtaPreferenceColors
+import fuck.andes.ui.components.EtaPreferenceIcon
 import fuck.andes.ui.components.ItemDescriptionDialog
 import fuck.andes.ui.components.iconForTool
 import fuck.andes.ui.model.AgentToolsAction
@@ -31,13 +30,10 @@ import fuck.andes.ui.model.ToolItemUi
 import fuck.andes.ui.model.actualToolName
 import fuck.andes.ui.model.toolCardAction
 import fuck.andes.ui.model.toolCardRequirement
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
 @Composable
 internal fun ToolCard(
@@ -61,31 +57,14 @@ internal fun ToolCard(
         AgentToolsAction.OpenEnhancements -> stringResource(R.string.tools_view_enhancements)
         else -> stringResource(R.string.ui_view_description)
     }
-    Card(
-        modifier = modifier.heightIn(min = 136.dp),
-        insideMargin = PaddingValues(16.dp),
-        colors = CardDefaults.defaultColors(
-            color = MiuixTheme.colorScheme.surfaceContainer,
-            contentColor = MiuixTheme.colorScheme.onSurfaceContainer,
-        ),
-        pressFeedbackType = PressFeedbackType.Sink,
-        showIndication = true,
-        onClick = {
-            if (action != null) onAction(action) else showDescription = true
-        },
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = iconForTool(tool.id),
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MiuixTheme.colorScheme.onSurfaceContainer,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            if (action != null) {
+    EtaFeatureCard(
+        title = tool.title,
+        summary = description,
+        modifier = modifier,
+        onClick = { if (action != null) onAction(action) else showDescription = true },
+        icon = { EtaPreferenceIcon(icon = iconForTool(tool.id), tint = EtaPreferenceColors.Green) },
+        action = if (action != null) {
+            {
                 IconButton(onClick = { showDescription = true }) {
                     Icon(
                         imageVector = Icons.Rounded.Info,
@@ -95,24 +74,8 @@ internal fun ToolCard(
                     )
                 }
             }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = tool.title,
-            style = MiuixTheme.textStyles.body2,
-            fontWeight = FontWeight.Medium,
-            color = MiuixTheme.colorScheme.onSurfaceContainer,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = description,
-            style = MiuixTheme.textStyles.footnote1,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
+        } else null,
+    ) {
         requirementText?.let {
             Spacer(modifier = Modifier.height(8.dp))
             Text(

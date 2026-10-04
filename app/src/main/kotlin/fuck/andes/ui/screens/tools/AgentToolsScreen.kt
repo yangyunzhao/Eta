@@ -24,18 +24,19 @@ import androidx.compose.ui.unit.dp
 import fuck.andes.R
 import fuck.andes.agent.tool.AgentToolCapabilities
 import fuck.andes.ui.app.rememberDeviceCapabilities
+import fuck.andes.ui.components.EtaArrowPreference
+import fuck.andes.ui.components.EtaCard
+import fuck.andes.ui.components.EtaPreferenceGroup
+import fuck.andes.ui.components.EtaPreferenceGroupTitle
 import fuck.andes.ui.components.MiuixScaffoldPage
 import fuck.andes.ui.model.AgentToolsAction
 import fuck.andes.ui.model.AgentToolsUiState
 import fuck.andes.ui.model.ToolItemUi
 import fuck.andes.ui.model.projectToolGroups
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TabRow
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 private object ToolsMetrics {
-    val GridHorizontalPadding = 20.dp
+    val GridHorizontalPadding = 16.dp
     val GridGap = 12.dp
 }
 
@@ -65,8 +66,8 @@ fun AgentToolsScreen(
             )
         }
         item(key = "capability-discovery") {
-            Card(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp)) {
-                ArrowPreference(
+            EtaPreferenceGroup(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+                EtaArrowPreference(
                     title = stringResource(R.string.capability_enhancements),
                     summary = stringResource(R.string.capability_enhancements_summary),
                     onClick = { onAction(AgentToolsAction.OpenEnhancements) },
@@ -75,7 +76,7 @@ fun AgentToolsScreen(
         }
         groups.forEach { group ->
             item(key = "${group.id}-title") {
-                SmallTitle(group.title)
+                EtaPreferenceGroupTitle(group.title)
             }
             items(
                 items = group.tools.chunked(2),

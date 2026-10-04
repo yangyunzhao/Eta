@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-<p><a href="https://github.com/Mangi-11/Eta/releases"><img src="https://img.shields.io/github/downloads/Mangi-11/Eta/total?logo=github&amp;label=Downloads&amp;color=1677FF" alt="Total GitHub Releases downloads"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.10-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.10"> <img src="https://img.shields.io/badge/AGP-9.3.2-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.3.2"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
+<p><a href="https://github.com/Mangi-11/Eta/releases"><img src="https://img.shields.io/github/downloads/Mangi-11/Eta/total?logo=github&amp;label=Downloads&amp;color=1677FF" alt="Total GitHub Releases downloads"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.1-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.1"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
 
 **A third-party, system-level AI assistant for Android**
 
@@ -24,17 +24,17 @@ Requires **Android 14 or later**. The app works across phone brands, and core fe
 
 | GUI Agent | Breeno with your own model |
 | :---: | :---: |
-| <img src="docs/Screenshots/demo_gui_agent.gif" width="320" alt="Eta GUI Agent in action"> | <img src="docs/Screenshots/demo_tools.gif" width="320" alt="Starting an Eta task through Breeno"> |
+| <img src="Screenshots/demo_gui_agent.gif" width="320" alt="Eta GUI Agent in action"> | <img src="Screenshots/demo_tools.gif" width="320" alt="Starting an Eta task through Breeno"> |
 
 More screenshots: chat, system tools, and settings
 
 | Chat | Commands through Breeno | Direct system API calls |
 | :---: | :---: | :---: |
-| ![Chat](docs/Screenshots/chat_home.jpg) | ![Commands through Breeno](docs/Screenshots/chat_breeno_analysis.jpg) | ![Direct system API calls](docs/Screenshots/chat_device_direct.jpg) |
+| ![Chat](Screenshots/chat_home.jpg) | ![Commands through Breeno](Screenshots/chat_breeno_analysis.jpg) | ![Direct system API calls](Screenshots/chat_device_direct.jpg) |
 
 | Settings | Tools | Skills |
 | :---: | :---: | :---: |
-| ![Settings](docs/Screenshots/settings.jpg) | ![Tools](docs/Screenshots/tools.jpg) | ![Skills](docs/Screenshots/skills.jpg) |
+| ![Settings](Screenshots/settings.jpg) | ![Tools](Screenshots/tools.jpg) | ![Skills](Screenshots/skills.jpg) |
 
 
 ## Core capabilities
@@ -59,7 +59,7 @@ A task can combine these tools: read web sources and then organize files with a 
 
 The runtime runs inside Eta. Requests from chat and system assistants use the same agent loop: the model selects tools through tool calling, execution results return to its context, and it decides what to do next. Calls are validated against JSON Schema and permissions are checked before execution. Hooked processes only handle the entry point and return path.
 
-The runtime also manages streaming events, steering, cancellation, and incremental transcripts. Steering messages enter after the current turn completes. Conversations and results are stored locally; after an interruption, Eta attempts to recover existing records without automatically replaying actions. See [Agent Runtime](docs/AGENT_RUNTIME.md) for implementation details.
+The runtime also manages streaming events, steering, cancellation, and incremental transcripts. Steering messages enter after the current turn completes. Conversations and results are stored locally; after an interruption, Eta attempts to recover existing records without automatically replaying actions. See [Agent Runtime](AGENT_RUNTIME.md) for implementation details.
 
 ## A terminal designed for mobile
 
@@ -79,6 +79,8 @@ Eta's AI features require **your own model-provider API key**. Built-in provider
 
 The provider layer supports OpenAI-compatible Chat Completions, the Responses API, and Anthropic Messages, including SSE streaming, tool calling, image input, and reasoning content. Configure custom endpoints, headers, and request bodies; fetch model lists or add models manually; and override context windows and reasoning effort. Available features depend on the model and API. Some Responses providers also support server-side web search.
 
+Before using a model, enter its context window in tokens under Settings → Model Providers. Automatic context compaction is enabled by default under Settings → Context & Extensions; changes apply to the next run, and manual compaction remains available when disabled. Automatic compaction uses the provider's reported input usage and this configured window. Eta does not fill in missing windows or estimate request tokens; manual compaction remains available when input usage is absent.
+
 ## System assistant entry points
 
 - **Power-button long press:** choose the default OEM assistant, Gemini, or Eta.
@@ -92,7 +94,7 @@ Power-button interception requires LSPosed and a supported system.
 - **Gemini:** enable system-assistant capabilities, including making the Google app a system app, voice input on the lock screen and while the screen is on, and support for keeping hotword detection working with the screen off.
 - **Circle to Search:** enable the feature and trigger it with a long press on the navigation handle or a two-finger long press on the screen.
 
-These features require LSPosed and a supported system. See [Technical Implementation](docs/TECHNICAL.md) for functionality and compatibility details.
+These features require LSPosed and a supported system. See [Technical Implementation](TECHNICAL.md) for functionality and compatibility details.
 
 ## Permissions and data
 
@@ -113,7 +115,7 @@ System tools, sensitive reads, sensitive actions, terminal and file access, brow
 - **Rooted devices:** gain access to protected system settings, app management, privileged files, dedicated personal-data searches, root shells, and chroot.
 - **LSPosed with a compatible ROM:** adds OEM assistant integration, system shortcuts, and Google feature enablement. Some features also require root.
 
-Dedicated searches for contacts, SMS messages, and calendar events still require root. See [Device Support](docs/ROOTLESS_SUPPORT.md) for full requirements and validation coverage.
+Dedicated searches for contacts, SMS messages, and calendar events still require root. See [Device Support](ROOTLESS_SUPPORT.md) for full requirements and validation coverage.
 
 ## Why I built Eta
 
@@ -165,11 +167,11 @@ Eta starts with the models, context, and tools available on Android today. A ful
 
 These implementation notes are currently in Chinese:
 
-- [Device support and permissions](docs/ROOTLESS_SUPPORT.md): unrooted and rooted devices, the file workspace, and background execution.
-- [Technical implementation](docs/TECHNICAL.md): system tools, data retrieval, browser, terminal, and system integration.
-- [Agent Runtime](docs/AGENT_RUNTIME.md): the agent loop, providers, steering, transcripts, and result recovery.
-- [HyperOS system entry points](docs/HYPEROS_SYSTEM_ENTRY.md): power-button and Circle to Search integration, requirements, and validation coverage.
-- [Native terminal components](docs/TERMINAL_NATIVE.md): PTY and PRoot components, and rebuilding the bundled source.
+- [Device support and permissions](ROOTLESS_SUPPORT.md): unrooted and rooted devices, the file workspace, and background execution.
+- [Technical implementation](TECHNICAL.md): system tools, data retrieval, browser, terminal, and system integration.
+- [Agent Runtime](AGENT_RUNTIME.md): the agent loop, providers, steering, transcripts, and result recovery.
+- [HyperOS system entry points](HYPEROS_SYSTEM_ENTRY.md): power-button and Circle to Search integration, requirements, and validation coverage.
+- [Native terminal components](TERMINAL_NATIVE.md): PTY and PRoot components, and rebuilding the bundled source.
 
 ## References and acknowledgements
 
@@ -180,6 +182,6 @@ These implementation notes are currently in Chinese:
 
 ## License
 
-Eta uses the [PolyForm Noncommercial License 1.0.0](LICENSE); personal redistribution, sales, paid installation, and other commercial use require prior written permission from the [author](https://github.com/Mangi-11).
+Eta uses the [PolyForm Noncommercial License 1.0.0](../LICENSE); personal redistribution, sales, paid installation, and other commercial use require prior written permission from the [author](https://github.com/Mangi-11).
 
 <sub>Community: <a href="https://linux.do">LINUX DO</a></sub>

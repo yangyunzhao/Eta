@@ -4,5 +4,8 @@
     android:sessionService="fuck.andes.agent.voice.EtaVoiceInteractionSessionService"
     android:settingsActivity="fuck.andes.ui.MainActivity"
     android:supportsAssist="true"
+    android:usesAssistData="true"
+    android:usesAssistScreenshots="true"
+    android:usesAssistStructureScreenContent="true"
     android:supportsLaunchVoiceAssistFromKeyguard="true"
     android:supportsLocalInteraction="false" />

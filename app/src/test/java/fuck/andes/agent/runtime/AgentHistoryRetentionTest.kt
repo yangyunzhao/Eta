@@ -39,12 +39,12 @@ class AgentHistoryRetentionTest {
     @Before fun setup() {
         context = RuntimeEnvironment.getApplication()
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        context.deleteDatabase("fuck_andes.db")
     }
 
     @After fun cleanup() {
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        context.deleteDatabase("fuck_andes.db")
     }
 
     @Test fun fullHistoryAndLargeMessageSurviveDatabaseReopen() {

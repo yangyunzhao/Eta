@@ -1,10 +1,7 @@
 @file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
 
 package fuck.andes.ui.pages.providers
-import fuck.andes.R
-import androidx.compose.ui.res.stringResource
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +10,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -23,26 +24,24 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import fuck.andes.EtaApp
+import fuck.andes.R
 import fuck.andes.data.auth.CodexLoginState
 import fuck.andes.data.model.AnthropicProviderSetting
 import fuck.andes.data.model.CustomProviderSetting
-import fuck.andes.data.model.OpenAiCompatibleProviderSetting
 import fuck.andes.data.model.OpenAiEndpointMode
 import fuck.andes.data.model.ProviderAuthModes
 import fuck.andes.data.model.ProviderSetting
@@ -50,6 +49,13 @@ import fuck.andes.data.model.withId
 import fuck.andes.data.repository.ProviderRepository
 import fuck.andes.data.repository.RemoteModelFetcher
 import fuck.andes.data.repository.RuntimeConfigRepository
+import fuck.andes.ui.components.EtaCard
+import fuck.andes.ui.components.EtaOverlayDialog
+import fuck.andes.ui.components.EtaPreference
+import fuck.andes.ui.components.EtaPreferenceDivider
+import fuck.andes.ui.components.EtaSwitchPreference
+import fuck.andes.ui.components.EtaTextButton
+import fuck.andes.ui.components.EtaWindowSpinnerPreference
 import fuck.andes.ui.components.MiuixDialogActions
 import fuck.andes.ui.components.MiuixPageBottomSpacer
 import fuck.andes.ui.components.MiuixScaffold
@@ -61,55 +67,17 @@ import fuck.andes.ui.navigation.NewProviderType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.DropdownItem
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-
-private data class ProviderConfigDraft(
-    val name: String,
-    val baseUrl: String,
-    val apiKey: String,
-    val authMode: String,
-    val systemPrompt: String,
-    val isEnabled: Boolean,
-    val endpointMode: String,
-    val hostedWebSearchEnabled: Boolean,
-    val anthropicVersion: String,
-) {
-    companion object {
-        fun from(provider: ProviderSetting): ProviderConfigDraft = ProviderConfigDraft(
-            name = provider.name,
-            baseUrl = provider.baseUrl,
-            apiKey = provider.apiKey,
-            authMode = provider.authMode,
-            systemPrompt = provider.systemPrompt.orEmpty(),
-            isEnabled = provider.isEnabled,
-            endpointMode = when (provider) {
-                is OpenAiCompatibleProviderSetting -> provider.endpointMode
-                is CustomProviderSetting -> provider.endpointMode
-                is AnthropicProviderSetting -> ""
-            },
-            hostedWebSearchEnabled = provider.hostedWebSearchEnabled,
-            anthropicVersion = (provider as? AnthropicProviderSetting)?.anthropicVersion
-                ?: AnthropicProviderSetting.DEFAULT_ANTHROPIC_VERSION,
-        )
-    }
-}
 
 @Composable
 internal fun ModelProviderDetailScreen(
@@ -159,7 +127,7 @@ internal fun ModelProviderDetailScreen(
                 ) {
                     Text(stringResource(R.string.ui_provider_does_not_exist_83cee6))
                     Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(text = stringResource(R.string.ui_return_11d024), onClick = onBack)
+                    EtaTextButton(text = stringResource(R.string.ui_return_11d024), onClick = onBack)
                 }
             }
         }
@@ -169,7 +137,12 @@ internal fun ModelProviderDetailScreen(
     val initial = provider ?: draft!!
     val isNew = provider == null
     var currentTab by remember { mutableIntStateOf(0) }
-    var configDraft by remember(initial.id) { mutableStateOf(ProviderConfigDraft.from(initial)) }
+    var configDraft by rememberSaveable(
+        initial.id,
+        stateSaver = ProviderConfigDraftSaver,
+    ) {
+        mutableStateOf(ProviderConfigDraft.from(initial))
+    }
     val title = if (isNew) context.getString(R.string.page_create_new_provider_36cab9) else initial.name
 
     MiuixScaffold(title = title, onBack = onBack) { paddingValues, scrollBehavior, sidePadding ->
@@ -230,6 +203,7 @@ private fun ProviderConfigTab(
     onDeleted: () -> Unit,
 ) {
     val context = LocalContext.current
+    var headersExpanded by rememberSaveable { mutableStateOf(false) }
     var apiKeyVisible by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var testStatus by remember { mutableStateOf<String?>(null) }
@@ -252,6 +226,8 @@ private fun ProviderConfigTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            // 低层 MiuixScaffold 只负责把顶栏 Insets 传给调用方，输入法 Insets 由列表自行消费。
+            .imePadding()
             .scrollEndHaptic()
             .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -307,8 +283,8 @@ private fun ProviderConfigTab(
                     }
                 }
                 if (!codexMode && provider !is AnthropicProviderSetting) {
-                    HorizontalDivider()
-                    WindowSpinnerPreference(
+                    EtaPreferenceDivider(hasLeading = false)
+                    EtaWindowSpinnerPreference(
                         items = listOf(
                             DropdownItem(text = "Chat Completions API"),
                             DropdownItem(text = "Responses API"),
@@ -333,8 +309,8 @@ private fun ProviderConfigTab(
                         },
                     )
                     if (draft.endpointMode == OpenAiEndpointMode.RESPONSES) {
-                        HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
-                        SwitchPreference(
+                        EtaPreferenceDivider(hasLeading = false)
+                        EtaSwitchPreference(
                             title = stringResource(R.string.ui_server_side_web_search_ddb8e0),
                             summary = stringResource(R.string.ui_allows_the_model_to_call_web_searches_provided_by_th_2f752f),
                             checked = draft.hostedWebSearchEnabled,
@@ -345,8 +321,8 @@ private fun ProviderConfigTab(
                     }
                 }
                 if (!codexMode) {
-                    HorizontalDivider()
-                    BasicComponent(
+                    EtaPreferenceDivider(hasLeading = false)
+                    EtaPreference(
                     title = stringResource(R.string.ui_test_connection_10b7d8),
                     summary = testStatus,
                     enabled = !isWorking,
@@ -354,7 +330,7 @@ private fun ProviderConfigTab(
                         val validationError = validateProviderDraft(context, provider, draft)
                         if (validationError != null) {
                             testStatus = context.getString(R.string.provider_error, validationError)
-                            return@BasicComponent
+                            return@EtaPreference
                         }
                         scope.launch {
                             isWorking = true
@@ -373,6 +349,7 @@ private fun ProviderConfigTab(
                                         endpointMode = draft.endpointMode,
                                         hostedWebSearchEnabled = draft.hostedWebSearchEnabled,
                                         anthropicVersion = draft.anthropicVersion,
+                                        customHeaders = draft.headers.map { it.header },
                                     )
                                 )
                             } finally {
@@ -385,14 +362,23 @@ private fun ProviderConfigTab(
             }
         }
 
+        if (!codexMode) {
+            providerHeadersEditor(
+                headers = draft.headers,
+                expanded = headersExpanded,
+                onExpandedChange = { headersExpanded = it },
+                onHeadersChange = { onDraftChange(draft.copy(headers = it)) },
+            )
+        }
+
         item(key = "preferences_and_prompt") {
             ProviderSection(title = stringResource(R.string.ui_preferences_and_strategies_2abd3c)) {
-                SwitchPreference(
+                EtaSwitchPreference(
                     title = stringResource(R.string.ui_enable_this_provider_683a76),
                     checked = draft.isEnabled,
                     onCheckedChange = { onDraftChange(draft.copy(isEnabled = it)) }
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                EtaPreferenceDivider(hasLeading = false)
                 Column(modifier = Modifier.padding(16.dp)) {
                     TextField(
                         value = draft.systemPrompt,
@@ -422,7 +408,7 @@ private fun ProviderConfigTab(
                     .padding(top = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                TextButton(
+                EtaTextButton(
                     text = when {
                         isWorking -> context.getString(R.string.page_saving_d70d42)
                         creationCommitted -> context.getString(R.string.page_created_62cfc5)
@@ -436,7 +422,7 @@ private fun ProviderConfigTab(
                         val validationError = validateProviderDraft(context, provider, draft)
                         if (validationError != null) {
                             status = context.getString(R.string.provider_error, validationError)
-                            return@TextButton
+                            return@EtaTextButton
                         }
                         scope.launch {
                             isWorking = true
@@ -451,6 +437,7 @@ private fun ProviderConfigTab(
                                 endpointMode = draft.endpointMode,
                                 hostedWebSearchEnabled = draft.hostedWebSearchEnabled,
                                 anthropicVersion = draft.anthropicVersion,
+                                customHeaders = draft.headers.map { it.header },
                             )
                             try {
                                 if (isNew) {
@@ -460,11 +447,10 @@ private fun ProviderConfigTab(
                                     if (added.isEnabled) {
                                         RuntimeConfigRepository.setSelectedProviderId(added.id)
                                     }
-                                    val ok = RuntimeConfigRepository.syncToRemotePreferences(
+                                    RuntimeConfigRepository.syncToRemotePreferences(
                                         EtaApp.serviceInstance
                                     )
-                                    status = if (ok) context.getString(R.string.page_created_set_current_and_synced_a99010)
-                                    else context.getString(R.string.page_created_and_set_as_current_lsposed_service_is_not_co_baa03d)
+                                    status = context.getString(R.string.capability_provider_created)
                                     creationCommitted = true
                                     onCreated(added.id)
                                 } else {
@@ -472,13 +458,12 @@ private fun ProviderConfigTab(
                                     if (built.isEnabled) {
                                         RuntimeConfigRepository.setSelectedProviderId(built.id)
                                     }
-                                    val ok = RuntimeConfigRepository.syncToRemotePreferences(
+                                    RuntimeConfigRepository.syncToRemotePreferences(
                                         EtaApp.serviceInstance
                                     )
                                     status = when {
                                         !built.isEnabled -> context.getString(R.string.page_saved_provider_not_enabled_7afa54)
-                                        ok -> context.getString(R.string.page_saved_current_and_synced_95dac1)
-                                        else -> context.getString(R.string.page_saved_and_set_as_current_lsposed_service_not_connect_08da2c)
+                                        else -> context.getString(R.string.capability_provider_saved)
                                     }
                                 }
                             } catch (cancelled: CancellationException) {
@@ -508,10 +493,10 @@ private fun ProviderConfigTab(
 
         if (!isNew) {
             item(key = "danger_zone") {
-                Card(
+                EtaCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = 16.dp)
                         .padding(top = 12.dp),
                     showIndication = true,
                     onClick = if (isWorking) {
@@ -545,7 +530,7 @@ private fun ProviderConfigTab(
     }
 
     if (showDeleteDialog) {
-        OverlayDialog(
+        EtaOverlayDialog(
             show = true,
             title = stringResource(R.string.ui_remove_provider_9f848f),
             summary = stringResource(R.string.provider_delete_summary, provider.name),
@@ -583,7 +568,7 @@ private fun ProviderConfigTab(
     }
 
     if (showResetDialog) {
-        OverlayDialog(
+        EtaOverlayDialog(
             show = true,
             title = stringResource(R.string.ui_reset_built_in_configuration_35b6ec),
             summary = stringResource(R.string.provider_reset_summary, provider.name),
@@ -618,70 +603,6 @@ private fun ProviderConfigTab(
             )
         }
     }
-}
-
-internal fun buildUpdatedProvider(
-    source: ProviderSetting,
-    name: String,
-    baseUrl: String,
-    apiKey: String,
-    authMode: String,
-    systemPrompt: String,
-    isEnabled: Boolean,
-    endpointMode: String,
-    hostedWebSearchEnabled: Boolean,
-    anthropicVersion: String,
-    codexOAuthEnabled: Boolean = fuck.andes.data.model.CodexOAuthFeaturePolicy.isEnabled,
-): ProviderSetting {
-    val prompt = systemPrompt.trim().takeIf { it.isNotBlank() }
-    val effectiveAuthMode = effectiveProviderAuthMode(source, authMode, codexOAuthEnabled)
-    return when (source) {
-        is OpenAiCompatibleProviderSetting -> source.copy(
-            name = name.trim(),
-            baseUrl = baseUrl.trim(),
-            apiKey = apiKey.trim(),
-            authMode = effectiveAuthMode,
-            systemPrompt = prompt,
-            isEnabled = isEnabled,
-            endpointMode = endpointMode,
-            hostedWebSearchEnabled = hostedWebSearchEnabled,
-        )
-        is CustomProviderSetting -> source.copy(
-            name = name.trim(),
-            baseUrl = baseUrl.trim(),
-            apiKey = apiKey.trim(),
-            authMode = effectiveAuthMode,
-            systemPrompt = prompt,
-            isEnabled = isEnabled,
-            endpointMode = endpointMode,
-            hostedWebSearchEnabled = hostedWebSearchEnabled,
-        )
-        is AnthropicProviderSetting -> source.copy(
-            name = name.trim(),
-            baseUrl = baseUrl.trim(),
-            apiKey = apiKey.trim(),
-            authMode = effectiveAuthMode,
-            systemPrompt = prompt,
-            isEnabled = isEnabled,
-            anthropicVersion = anthropicVersion.trim().ifBlank { AnthropicProviderSetting.DEFAULT_ANTHROPIC_VERSION },
-        )
-    }
-}
-
-private fun validateProviderDraft(
-    context: android.content.Context,
-    provider: ProviderSetting,
-    draft: ProviderConfigDraft,
-): String? {
-    if (draft.name.isBlank()) return context.getString(R.string.page_name_cannot_be_empty_ca8984)
-    if (supportsCodexOAuth(provider) && draft.authMode == ProviderAuthModes.CODEX_OAUTH) {
-        return null
-    }
-    val uri = runCatching { java.net.URI(draft.baseUrl.trim()) }.getOrNull()
-    if (uri == null || uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank()) {
-        return context.getString(R.string.page_base_url_must_be_a_valid_http_s_address_0e7d58)
-    }
-    return null
 }
 
 private suspend fun testConnection(

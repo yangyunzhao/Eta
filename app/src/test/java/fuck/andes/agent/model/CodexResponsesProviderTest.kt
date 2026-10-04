@@ -61,6 +61,31 @@ class CodexResponsesProviderTest {
     }
 
     @Test
+    fun `compaction and reply rewrite omit all tools and custom request overrides`() {
+        listOf(ProviderRequestPurpose.COMPACTION, ProviderRequestPurpose.REPLY_REWRITE).forEach { purpose ->
+            server.enqueue(sseResponse(completedSse("ok")))
+            val config = codexConfig().copy(
+                hostedWebSearchEnabled = true,
+                extraBodyJson = """{"metadata":"BAD_EXTRA"}""",
+                customBody = listOf(CustomBody("metadata", JsonPrimitive("BAD_CUSTOM"))),
+            )
+            val tool = JSONObject().put("type", "function").put("function",
+                JSONObject().put("name", "device_info").put("description", "device")
+                    .put("parameters", JSONObject().put("type", "object")))
+            provider(SequenceCredentialProvider(listOf(credential("access-one")))).complete(
+                ProviderRequest(config, JSONArray().put(JSONObject().put("role", "user")
+                    .put("content", "总结以下历史")), JSONArray().put(tool), purpose = purpose),
+                AgentRunController(),
+            )
+            val body = JSONObject(requireNotNull(requireNotNull(server.takeRequest(5, TimeUnit.SECONDS)).body).utf8())
+            assertFalse(body.has("tools"))
+            assertFalse(body.has("tool_choice"))
+            assertFalse(body.has("metadata"))
+            assertTrue(body.toString().contains("总结以下历史"))
+        }
+    }
+
+    @Test
     fun `request fixes Codex route headers and protected body while preserving conversation`() {
         server.enqueue(sseResponse(completedSse(text = "ok")))
         val provider = provider(
@@ -542,6 +567,7 @@ class CodexResponsesProviderTest {
         baseUrl = "http://attacker.invalid/v1",
         apiKey = "",
         model = "gpt-5.5",
+        contextWindow = 128_000,
         systemPrompt = "system",
         openAiEndpointMode = OpenAiEndpointMode.RESPONSES,
         authMode = ProviderAuthModes.CODEX_OAUTH,

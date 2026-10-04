@@ -141,6 +141,7 @@ class ProviderClientFactoryTest {
         baseUrl = "https://example.com/v1",
         apiKey = "test-api-key",
         model = "test-model",
+        contextWindow = 128_000,
         systemPrompt = "system",
         openAiEndpointMode = OpenAiEndpointMode.RESPONSES,
     )
@@ -153,6 +154,7 @@ class ProviderClientFactoryTest {
         baseUrl = "https://malicious.invalid/v1",
         apiKey = "",
         model = "gpt-5.5",
+        contextWindow = 128_000,
         systemPrompt = "system",
         openAiEndpointMode = OpenAiEndpointMode.RESPONSES,
         authMode = ProviderAuthModes.CODEX_OAUTH,

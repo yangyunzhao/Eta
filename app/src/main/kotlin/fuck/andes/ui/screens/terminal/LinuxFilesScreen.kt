@@ -28,10 +28,10 @@ import fuck.andes.agent.terminal.LinuxDistribution
 import fuck.andes.agent.terminal.LinuxEnvironmentPaths
 import fuck.andes.agent.terminal.LinuxFileExplorer
 import fuck.andes.agent.terminal.ShellProcessSupervisor
+import fuck.andes.ui.components.EtaPreference
 import fuck.andes.ui.components.MiuixScaffoldPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -262,7 +262,7 @@ private fun FileRow(
     summary: String?,
     onClick: () -> Unit,
 ) {
-    BasicComponent(
+    EtaPreference(
         title = name,
         summary = summary,
         startAction = {

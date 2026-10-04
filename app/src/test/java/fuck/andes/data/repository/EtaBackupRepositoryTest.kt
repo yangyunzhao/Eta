@@ -8,6 +8,8 @@ import fuck.andes.data.db.ConversationStateEntity
 import fuck.andes.data.db.EtaDatabase
 import fuck.andes.data.model.ModelSource
 import fuck.andes.data.model.withApiKey
+import fuck.andes.data.provider.BuiltinProviders
+import fuck.andes.data.provider.OfficialModelCatalog
 import fuck.andes.agent.roleplay.CharacterCardCodec
 import fuck.andes.agent.roleplay.RoleplayBinding
 import fuck.andes.agent.roleplay.RoleplayMessageLink
@@ -37,9 +39,12 @@ class EtaBackupRepositoryTest {
     @Before
     fun setUp() {
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        context.deleteDatabase("fuck_andes.db")
         SettingsDataStore.init(context)
-        runBlocking { SettingsDataStore.setSelection(null, null) }
+        runBlocking {
+            SettingsDataStore.setSelection(null, null)
+            SettingsDataStore.setOfficialModelCatalogRevision(0)
+        }
         ProviderRepository.init(context)
         AgentMemoryRepository.init(context)
     }
@@ -161,6 +166,43 @@ class EtaBackupRepositoryTest {
             """{"format":"eta-backup","schemaVersion":1,"exportedAt":0}""".toByteArray(),
         ))
         assertEquals(0, summary.characterCount)
+    }
+
+    @Test
+    fun oldBackupReceivesOnlyModelsAddedAfterItsCatalogRevision() = runBlocking {
+        ProviderRepository.ensureBuiltInsMerged()
+        val providers = EtaDatabase.get(context).providerDao().providers().map { row ->
+            val models = if (row.provider.id == BuiltinProviders.OPENAI_ID) {
+                row.models.filterNot { it.modelId.startsWith("gpt-6-") || it.modelId == "gpt-5.6-terra" }
+            } else {
+                row.models
+            }
+            EtaBackupProvider(row.provider, models)
+        }
+        val oldBackup = EtaBackupDocument(exportedAt = 0, providers = providers)
+        EtaBackupRepository.import(context, ByteArrayInputStream(Json.encodeToString(oldBackup).toByteArray()))
+
+        val restored = ProviderRepository.providerById(BuiltinProviders.OPENAI_ID)!!.models
+        assertTrue(restored.any { it.modelId == "gpt-6-astra" })
+        assertTrue(restored.none { it.modelId == "gpt-5.6-terra" })
+        assertEquals(OfficialModelCatalog.CURRENT_REVISION, SettingsDataStore.officialModelCatalogRevision())
+    }
+
+    @Test
+    fun currentBackupKeepsDeletionOfNewCatalogModel() = runBlocking {
+        ProviderRepository.ensureBuiltInsMerged()
+        val provider = ProviderRepository.providerById(BuiltinProviders.OPENAI_ID)!!
+        val removed = provider.models.first { it.modelId == "gpt-6-sol" }
+        ModelRepository.deleteModel(provider.id, removed.id)
+        val output = ByteArrayOutputStream()
+        EtaBackupRepository.export(context, output)
+        val document = Json.decodeFromString<EtaBackupDocument>(output.toString(Charsets.UTF_8.name()))
+        assertEquals(OfficialModelCatalog.CURRENT_REVISION, document.catalogRevision)
+
+        EtaBackupRepository.import(context, ByteArrayInputStream(output.toByteArray()))
+
+        assertTrue(ProviderRepository.providerById(provider.id)!!.models.none { it.modelId == removed.modelId })
+        assertEquals(OfficialModelCatalog.CURRENT_REVISION, SettingsDataStore.officialModelCatalogRevision())
     }
 
     @Test

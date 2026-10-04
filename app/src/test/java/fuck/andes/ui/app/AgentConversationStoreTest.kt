@@ -45,7 +45,7 @@ class AgentConversationStoreTest {
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        context.deleteDatabase("fuck_andes.db")
     }
 
     @Test

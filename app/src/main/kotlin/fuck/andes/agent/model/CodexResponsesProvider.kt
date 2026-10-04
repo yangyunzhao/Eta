@@ -8,6 +8,7 @@ import fuck.andes.data.auth.CodexCredentialProvider
 import fuck.andes.data.auth.CodexOAuthCredential
 import fuck.andes.data.model.ProviderAuthModes
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -38,10 +39,13 @@ internal class CodexResponsesProvider private constructor(
         .followRedirects(false)
         .followSslRedirects(false)
         .build()
+    private val compactionCallFactory = callFactory.newBuilder()
+        .callTimeout(AgentHttpClient.MODEL_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .build()
 
     constructor(credentialProvider: CodexCredentialProvider) : this(
         credentialProvider = credentialProvider,
-        httpClient = AgentHttpClient.client,
+        httpClient = AgentHttpClient.modelClient,
         endpointUrl = FIXED_ENDPOINT,
         debugLogger = CodexProtocolDebugLogger.default(),
     )
@@ -65,22 +69,22 @@ internal class CodexResponsesProvider private constructor(
     ): ProviderResponse {
         validateRequest(request)
         val requestJson = ResponsesRequestBuilder.buildCodex(
-            request.config,
+            request.effectiveConfig,
             request.messages,
-            request.tools,
+            request.effectiveTools,
         )
         val trace = debugLogger.beginRequest(request.config.model, requestJson)
         trace.log("request_built")
         val body = requestJson.toString()
         val firstCredential = credentialProvider.requireValidCredential(request.config.providerId)
-        return when (val firstAttempt = executeOnce(body, firstCredential, runController, onEvent, trace, 1)) {
+        return when (val firstAttempt = executeOnce(body, firstCredential, runController, onEvent, trace, 1, request.purpose)) {
             is AttemptResult.Success -> firstAttempt.response
             AttemptResult.Unauthorized -> {
                 val refreshed = credentialProvider.refreshAfterUnauthorized(
                     providerId = request.config.providerId,
                     rejectedAccessToken = firstCredential.accessToken,
                 )
-                when (val secondAttempt = executeOnce(body, refreshed, runController, onEvent, trace, 2)) {
+                when (val secondAttempt = executeOnce(body, refreshed, runController, onEvent, trace, 2, request.purpose)) {
                     is AttemptResult.Success -> secondAttempt.response
                     AttemptResult.Unauthorized -> {
                         val invalidated = credentialProvider.invalidateAfterUnauthorized(
@@ -122,6 +126,7 @@ internal class CodexResponsesProvider private constructor(
         onEvent: (ProviderEvent) -> Unit,
         trace: CodexProtocolDebugLogger.RequestTrace,
         attempt: Int,
+        purpose: ProviderRequestPurpose,
     ): AttemptResult {
         val httpRequest = try {
             val accessToken = credential.accessToken.requireSafeHeaderValue(MAX_ACCESS_TOKEN_CHARS)
@@ -147,7 +152,8 @@ internal class CodexResponsesProvider private constructor(
             trace.log("request_failed", JSONObject().put("failure", "invalid_header_value"), attempt)
             throw CodexResponsesException(CodexResponsesFailure.PROTOCOL_FAILURE)
         }
-        val call = callFactory.newCall(httpRequest)
+        val call = (if (purpose == ProviderRequestPurpose.COMPACTION) compactionCallFactory else callFactory)
+            .newCall(httpRequest)
         val binding = runController.register(call::cancel)
         try {
             runController.throwIfCancelled()

@@ -11,6 +11,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -20,6 +21,42 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class EtaDatabaseMigrationTest {
+    @Test
+    fun migration18To19CompletesMissingForkAuthAndMcpColumns() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val databaseName = "fork-v18-${UUID.randomUUID()}.db"
+        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(databaseName)
+            .callback(object : SupportSQLiteOpenHelper.Callback(18) {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    db.execSQL("CREATE TABLE model_providers (id TEXT NOT NULL PRIMARY KEY)")
+                    db.execSQL("CREATE TABLE mcp_servers (id TEXT NOT NULL PRIMARY KEY)")
+                    listOf("runtime_results", "runtime_archive_runs", "runtime_inflight_runs")
+                        .forEach { db.execSQL("CREATE TABLE $it (id TEXT NOT NULL PRIMARY KEY)") }
+                }
+
+                override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+            })
+            .build()
+        val helper = FrameworkSQLiteOpenHelperFactory().create(configuration)
+        try {
+            val database = helper.writableDatabase
+            EtaDatabase.MIGRATION_18_19.migrate(database)
+            fun hasColumn(table: String, column: String): Boolean =
+                database.query("PRAGMA table_info($table)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndexOrThrow("name")
+                    generateSequence { if (cursor.moveToNext()) cursor.getString(nameIndex) else null }
+                        .any { it == column }
+                }
+            assertTrue(hasColumn("model_providers", "auth_mode"))
+            assertTrue(hasColumn("mcp_servers", "tools_expire_at"))
+            assertTrue(hasColumn("runtime_results", "context_snapshot_json"))
+        } finally {
+            helper.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
     @Test
     fun migration6To21PreservesDataAndMovesCompleteConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context

@@ -13,14 +13,15 @@
 - [上游 v3.0.0 合并记录](UPSTREAM_V3.0.0_MERGE.md)
 - [上游 v3.0.2 合并记录](UPSTREAM_V3.0.2_MERGE.md)
 - [上游 v3.0.4 合并记录](UPSTREAM_V3.0.4_MERGE.md)
+- [上游 v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)
 
 当前发布版本为 [`v3.0.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.2.znmlr.1) / `2026090701`，基于上游 `v3.0.2`（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）。tag CI [34794064664](https://github.com/yangyunzhao/Eta/actions/runs/34794064664) 已通过完整单元测试、Lint、签名构建和 APK 校验；公开 Release APK SHA-256 为 `8DA68A5F1534806FE1700AAB006E1F2B7E96F10B1C99F47B3861918C76B44D0D`。用户已完成同证书覆盖安装及一般功能测试并反馈无问题。
 
-当前本地候选为上游 `v3.0.4`（`bc952e27169bf83dbef86380a54fc5b159e5609d`）对应的 `v3.0.4.znmlr.1` / `2026091202`。它尚未创建 tag 或 GitHub Release；签名候选 APK 的 CI 结果将记录在 [v3.0.4 合并记录](UPSTREAM_V3.0.4_MERGE.md)。
+当前试用候选合入上游 `v3.1.0`（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.1` / `2026100201`。v3.0.4 候选未完成发布门禁；用户试装确认后才会创建本次 tag 与 GitHub Release。验证证据见 [v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)。
 
 Fork 继续保留上游未覆盖的 Codex OAuth 能力：设备码、AndroidKeyStore 加密凭据、刷新/登出、固定 Codex Responses/模型目录、Runtime 隔离、Room `auth_mode` 与 `ultra` 推理档位。`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 均为历史发布记录。
 
-最新官方 Codex CLI `rust-v0.154.0` 的 MCP OAuth 协调刷新变化不改变 Eta 已验证的设备码、刷新、固定模型目录/Responses 路径或核心 SSE 终态；`CODEX_PROTOCOL_COMPAT_VERSION` 继续为 `0.147.0`，不机械升级。AndroidKeyStore instrumentation、真实 Codex 账号专项调用与注销后的敏感日志计数仍为已知验证缺口。
+2026-10-04 已按官方 Codex CLI 稳定版 `rust-v0.160.0`（peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`）静态核对设备码、刷新、固定模型目录/Responses 路径与 SSE 终态；`CODEX_PROTOCOL_COMPAT_VERSION` 继续为 `0.147.0`，不机械升级。AndroidKeyStore instrumentation、真实 Codex 账号专项调用与注销后的敏感日志计数仍为已知验证缺口。
 
 下游 CI/发布防护已经实现并通过代码审查：支持 `main`、`v*.znmlr.*` tag 和手动触发，构建前执行 unit test 与 lint，精确校验 tag、APK 和版本 metadata，并生成版本化资产名。它不会自动创建 tag、GitHub Release 或执行 push，且尚不能把上述本地门禁缺口记为通过；操作说明见 `.github/RELEASING.md`。
 
