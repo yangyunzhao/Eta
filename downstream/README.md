@@ -19,7 +19,7 @@
 
 当前修复候选合入上游 `v3.1.0`（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.2` / `2026100202`。此前 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后启动闪退，不得继续分发；用户验证修复候选后才会创建 tag 与 GitHub Release。证据见 [v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)。
 
-故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint、签名构建和 APK 校验，但真机启动失败。修复候选已补旧 Fork v19 的迁移测试，CI 签名与用户试装尚待完成。升级后需手动填写当前模型的上下文窗口大小。
+故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint、签名构建和 APK 校验，但真机启动失败。修复候选提交 `f935f6c3f97ca83b56c38d128bbbe65b6a40a467` 的 [CI run 37168306862](https://github.com/yangyunzhao/Eta/actions/runs/37168306862) 已通过完整单元测试、Lint、同证书签名构建和 APK 校验；试用 APK 为 `release/Eta-v3.1.0.znmlr.2-release.apk`，SHA-256 `918E20F66CB6BA2212D48631C63F0B2437F0EE3CB7532F8A848686F7FE21A2A9`。手机覆盖安装与启动验证待完成。升级后需手动填写当前模型的上下文窗口大小。
 
 Fork 继续保留上游未覆盖的 Codex OAuth 能力：设备码、AndroidKeyStore 加密凭据、刷新/登出、固定 Codex Responses/模型目录、Runtime 隔离、Room `auth_mode` 与 `ultra` 推理档位。`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 均为历史发布记录。
 

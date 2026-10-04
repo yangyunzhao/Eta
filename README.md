@@ -19,7 +19,7 @@
 
 当前修复候选合入上游 [`v3.1.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.1.0)（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.2` / `2026100202`。此前的 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后会在启动时闪退，不得继续分发；修复候选须经自动验证和用户安装确认后才会创建 tag 与 GitHub Release。
 
-故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint 和签名构建，但手机日志已确认旧 Fork v19→v21 升级缺列导致启动闪退。修复候选的 CI 与 APK 验证尚未完成；升级后仍需在模型提供商设置中手动填写当前模型的上下文窗口大小。
+故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint 和签名构建，但手机日志已确认旧 Fork v19→v21 升级缺列导致启动闪退。修复候选源码提交 `f935f6c3f97ca83b56c38d128bbbe65b6a40a467` 的 [CI run 37168306862](https://github.com/yangyunzhao/Eta/actions/runs/37168306862) 已通过完整单元测试、Lint、同证书签名构建和 APK 校验；本地试用 APK 为 `release/Eta-v3.1.0.znmlr.2-release.apk`，SHA-256 `918E20F66CB6BA2212D48631C63F0B2437F0EE3CB7532F8A848686F7FE21A2A9`。手机覆盖安装与启动验证待完成；升级后仍需在模型提供商设置中手动填写当前模型的上下文窗口大小。
 
 2026-10-04 已按官方 Codex CLI 稳定版 `rust-v0.160.0`（peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`）静态核对设备码、刷新、模型目录、Responses 请求与 SSE 终态，未发现必须先改协议的差异；`CODEX_PROTOCOL_COMPAT_VERSION` 仍表示已完整验证的 `0.147.0` 基线。真实 OAuth 调用、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需人工验收。
 
