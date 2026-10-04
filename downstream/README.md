@@ -19,6 +19,8 @@
 
 当前试用候选合入上游 `v3.1.0`（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.1` / `2026100201`。v3.0.4 候选未完成发布门禁；用户试装确认后才会创建本次 tag 与 GitHub Release。验证证据见 [v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)。
 
+候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 已通过完整单元测试、Lint、既有证书签名构建和 APK 校验。试用 APK 位于 `release/Eta-v3.1.0.znmlr.1-release.apk`，SHA-256 为 `3C5D569906EFF9933BED4E68B0FD21DFBED3131AE61D0D9998946EA9FB6B7E9A`；待用户覆盖安装与功能试用。升级后需手动填写当前模型的上下文窗口大小。
+
 Fork 继续保留上游未覆盖的 Codex OAuth 能力：设备码、AndroidKeyStore 加密凭据、刷新/登出、固定 Codex Responses/模型目录、Runtime 隔离、Room `auth_mode` 与 `ultra` 推理档位。`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 均为历史发布记录。
 
 2026-10-04 已按官方 Codex CLI 稳定版 `rust-v0.160.0`（peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`）静态核对设备码、刷新、固定模型目录/Responses 路径与 SSE 终态；`CODEX_PROTOCOL_COMPAT_VERSION` 继续为 `0.147.0`，不机械升级。AndroidKeyStore instrumentation、真实 Codex 账号专项调用与注销后的敏感日志计数仍为已知验证缺口。

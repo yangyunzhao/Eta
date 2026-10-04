@@ -19,6 +19,8 @@
 
 当前试用候选合入上游 [`v3.1.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.1.0)（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.1` / `2026100201`。此前的 v3.0.4 候选未完成发布门禁；本次候选须经自动验证和用户安装确认后才会创建 tag 与 GitHub Release。
 
+试用候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 已通过完整单元测试、Lint、既有证书签名构建和 APK 校验。本地试用文件为 `release/Eta-v3.1.0.znmlr.1-release.apk`，SHA-256 为 `3C5D569906EFF9933BED4E68B0FD21DFBED3131AE61D0D9998946EA9FB6B7E9A`；用户安装与功能试用待确认。升级后需在模型提供商设置中手动填写当前模型的上下文窗口大小。
+
 2026-10-04 已按官方 Codex CLI 稳定版 `rust-v0.160.0`（peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`）静态核对设备码、刷新、模型目录、Responses 请求与 SSE 终态，未发现必须先改协议的差异；`CODEX_PROTOCOL_COMPAT_VERSION` 仍表示已完整验证的 `0.147.0` 基线。真实 OAuth 调用、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需人工验收。
 
 仓库已经加入下游 CI/发布防护：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，并精确核对 tag、APK 和版本 metadata，发布资产使用版本化名称。该流程不会自动创建 tag、GitHub Release 或执行 push。详细发布步骤见 `.github/RELEASING.md`。

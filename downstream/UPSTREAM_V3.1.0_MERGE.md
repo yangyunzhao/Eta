@@ -9,6 +9,7 @@
 | 上游 release tag | `v3.1.0` |
 | tag peeled commit | `84d42dc23a328502db9216bfea1fe60590b9e44c` |
 | 下游试用目标 | `v3.1.0.znmlr.1` / `2026100201` |
+| 候选代码提交 | `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` |
 | 当前正式发布 | `v3.0.2.znmlr.1` / `2026090701` |
 
 ## 合并边界
@@ -25,9 +26,10 @@
 | 旧 v3.0.4 候选 6 项合并回归 | 本地定向测试已通过；修复提交 `0f6d17f`。 |
 | v3.1.0 合并后 Debug 编译 | 本地 `:app:compileDebugKotlin` 与测试源码编译通过。 |
 | OAuth/上下文压缩/迁移/版本/Provider 定向测试 | 本地通过；包含先失败再修复的 Codex 无工具请求与旧 v18 schema 测试。 |
-| 完整 JVM 单测 | 本机 Windows 首轮 1280 项中 60 项失败、8 项跳过；其中 Codex 测试夹具已定向修复，其余多涉及缺少 `sh` 与 Windows 文件路径。以最终代码的 Linux CI 为出包门禁。 |
-| Android Lint | 本地通过；后续修复由 Linux CI 再验证。 |
-| 既有证书签名的 Release APK 与包信息核验 | 待 CI 产出。 |
+| 完整 JVM 单测 | [Linux 候选 CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 通过。本机 Windows 首轮 1280 项中 60 项失败、8 项跳过；Codex 测试夹具已修复，剩余平台相关失败以 Linux CI 结果为准。 |
+| Android Lint | 本地与候选 CI 均通过。 |
+| 既有证书签名的 Release APK | 候选 CI 签名、组装、验证与上传通过；本地文件 `release/Eta-v3.1.0.znmlr.1-release.apk`，SHA-256 `3C5D569906EFF9933BED4E68B0FD21DFBED3131AE61D0D9998946EA9FB6B7E9A`。 |
+| 包信息与签名连续性 | 本机 `apksigner` 验证通过；包名 `fuck.andes`，`versionName 3.1.0.znmlr.1`，`versionCode 2026100201`；签名证书 SHA-256 `444deb65e119ae74386d76d216fcee7062b8a90c68af28de2953be24d71dc791`，与已发布 v3.0.2 APK 相同。 |
 | 覆盖安装、真实账号及关键功能试用 | 待用户验收。 |
 
 2026-10-04 核对官方 Codex CLI 稳定 release `rust-v0.160.0`，peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`。静态检查未发现设备码、刷新、固定端点、模型目录和 Responses SSE 的强制性不兼容变化；`CODEX_PROTOCOL_COMPAT_VERSION` 保持已完整验证的 `0.147.0`，真实账号与真机行为仍需验收。
