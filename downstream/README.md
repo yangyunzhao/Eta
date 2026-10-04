@@ -17,9 +17,9 @@
 
 当前发布版本为 [`v3.0.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.2.znmlr.1) / `2026090701`，基于上游 `v3.0.2`（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）。tag CI [34794064664](https://github.com/yangyunzhao/Eta/actions/runs/34794064664) 已通过完整单元测试、Lint、签名构建和 APK 校验；公开 Release APK SHA-256 为 `8DA68A5F1534806FE1700AAB006E1F2B7E96F10B1C99F47B3861918C76B44D0D`。用户已完成同证书覆盖安装及一般功能测试并反馈无问题。
 
-当前试用候选合入上游 `v3.1.0`（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.1` / `2026100201`。v3.0.4 候选未完成发布门禁；用户试装确认后才会创建本次 tag 与 GitHub Release。验证证据见 [v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)。
+当前修复候选合入上游 `v3.1.0`（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.2` / `2026100202`。此前 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后启动闪退，不得继续分发；用户验证修复候选后才会创建 tag 与 GitHub Release。证据见 [v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)。
 
-候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 已通过完整单元测试、Lint、既有证书签名构建和 APK 校验。试用 APK 位于 `release/Eta-v3.1.0.znmlr.1-release.apk`，SHA-256 为 `3C5D569906EFF9933BED4E68B0FD21DFBED3131AE61D0D9998946EA9FB6B7E9A`；待用户覆盖安装与功能试用。升级后需手动填写当前模型的上下文窗口大小。
+故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint、签名构建和 APK 校验，但真机启动失败。修复候选已补旧 Fork v19 的迁移测试，CI 签名与用户试装尚待完成。升级后需手动填写当前模型的上下文窗口大小。
 
 Fork 继续保留上游未覆盖的 Codex OAuth 能力：设备码、AndroidKeyStore 加密凭据、刷新/登出、固定 Codex Responses/模型目录、Runtime 隔离、Room `auth_mode` 与 `ultra` 推理档位。`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 均为历史发布记录。
 

@@ -5,9 +5,9 @@ import org.junit.Test
 
 class BuildVersionPolicyTest {
     @Test
-    fun `当前构建使用首个 znmlr 下游候选版本`() {
-        assertEquals("3.1.0.znmlr.1", BuildConfig.VERSION_NAME)
-        assertEquals(2_026_100_201, BuildConfig.VERSION_CODE)
+    fun `修复候选递增下游版本以覆盖安装故障候选`() {
+        assertEquals("3.1.0.znmlr.2", BuildConfig.VERSION_NAME)
+        assertEquals(2_026_100_202, BuildConfig.VERSION_CODE)
     }
 
     @Test
@@ -19,7 +19,7 @@ class BuildVersionPolicyTest {
 
         assertEquals("3.1.0", upstreamVersionName)
         assertEquals(2_026_100_201, upstreamVersionCode)
-        assertEquals(1, downstreamReleaseSequence)
+        assertEquals(2, downstreamReleaseSequence)
         assertEquals(
             "$upstreamVersionName.znmlr.$downstreamReleaseSequence",
             BuildConfig.VERSION_NAME,

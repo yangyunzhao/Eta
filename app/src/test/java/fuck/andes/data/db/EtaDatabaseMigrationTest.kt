@@ -22,6 +22,99 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class EtaDatabaseMigrationTest {
     @Test
+    fun releasedForkVersion19UpgradesTo21WithoutLosingRuntimeAndProviderData() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val databaseName = "released-fork-v19-${UUID.randomUUID()}.db"
+        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(databaseName)
+            .callback(object : SupportSQLiteOpenHelper.Callback(19) {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    VERSION_6_SCHEMA.forEach(db::execSQL)
+                    listOf(
+                        EtaDatabase.MIGRATION_6_7,
+                        EtaDatabase.MIGRATION_7_8,
+                        EtaDatabase.MIGRATION_8_9,
+                        EtaDatabase.MIGRATION_9_10,
+                        EtaDatabase.MIGRATION_10_11,
+                        EtaDatabase.MIGRATION_11_12,
+                        EtaDatabase.MIGRATION_12_13,
+                        EtaDatabase.MIGRATION_13_14,
+                        EtaDatabase.MIGRATION_14_15,
+                        EtaDatabase.MIGRATION_15_16,
+                        EtaDatabase.MIGRATION_16_17,
+                        EtaDatabase.MIGRATION_17_18,
+                    ).forEach { it.migrate(db) }
+                    // The published v3.0.2.znmlr.1 migration adds these columns at v19,
+                    // but does not add context_snapshot_json or operation to runtime tables.
+                    db.execSQL(
+                        "INSERT INTO conversations (id, title, thinking_enabled, history_json, " +
+                            "created_at, updated_at, applied_runtime_run_ids_json, reasoning_effort) " +
+                            "VALUES ('conv-1', '保留的对话', 0, '[]', 1, 1, '[]', 'off')"
+                    )
+                    db.execSQL(
+                        "INSERT INTO model_providers " +
+                            "(id, type, name, base_url, api_key, is_enabled, is_built_in, sort_order, " +
+                            "system_prompt, custom_headers_json, custom_body_json, created_at, " +
+                            "endpoint_mode, anthropic_version, auth_mode, hosted_web_search_enabled) " +
+                            "VALUES ('provider-1', 'openai_compatible', 'Provider', 'https://example.com/v1', " +
+                            "'', 1, 0, 0, NULL, '[]', '[]', 1, 'responses', '2023-06-01', " +
+                            "'CODEX_OAUTH', 0)"
+                    )
+                    db.execSQL(
+                        "INSERT INTO runtime_results (run_id, handoff_id, handoff_source, " +
+                            "handoff_payload, dismiss_entry_surface, ok, content, error, " +
+                            "reasoning_content, created_at, transcript_json) VALUES " +
+                            "('run-1', 'handoff-1', 'test', '{}', 0, 1, '保留的结果', NULL, '', 1, '[]')"
+                    )
+                    db.execSQL(
+                        "INSERT INTO runtime_archive_runs (archive_run_id, run_id, handoff_id, " +
+                            "handoff_source, handoff_payload, dismiss_entry_surface, ok, content, " +
+                            "error, reasoning_content, created_at, transcript_json, user_image_previews_json) " +
+                            "VALUES ('archive-1', 'run-1', 'handoff-1', 'test', '{}', 0, 1, " +
+                            "'保留的归档', NULL, '', 1, '[]', '[]')"
+                    )
+                    db.execSQL(
+                        "INSERT INTO runtime_inflight_runs (run_id, owner_instance_id, handoff_id, " +
+                            "handoff_source, handoff_payload, dismiss_entry_surface, created_at, updated_at) " +
+                            "VALUES ('inflight-1', 'instance-1', 'handoff-2', 'test', '{}', 0, 1, 1)"
+                    )
+                }
+
+                override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+            })
+            .build()
+        FrameworkSQLiteOpenHelperFactory().create(configuration).also { helper ->
+            helper.writableDatabase
+            helper.close()
+        }
+
+        val database = Room.databaseBuilder(context, EtaDatabase::class.java, databaseName)
+            .addMigrations(EtaDatabase.MIGRATION_19_20, EtaDatabase.MIGRATION_20_21)
+            .build()
+        try {
+            val result = runBlocking(Dispatchers.IO) { database.runtimeRunDao().runtimeResults().single() }
+            assertEquals("保留的结果", result.content)
+            assertEquals("", result.contextSnapshotJson)
+            assertEquals("chat", result.operation)
+            val archive = runBlocking(Dispatchers.IO) { database.runtimeRunDao().archivedRuns().single().run }
+            assertEquals("保留的归档", archive.content)
+            assertEquals("", archive.contextSnapshotJson)
+            assertEquals("chat", archive.operation)
+            val inFlight = runBlocking(Dispatchers.IO) { database.runtimeRunDao().inFlightRuns().single().run }
+            assertEquals("instance-1", inFlight.ownerInstanceId)
+            assertEquals("", inFlight.contextSnapshotJson)
+            assertEquals("chat", inFlight.operation)
+            val conversation = runBlocking(Dispatchers.IO) { database.conversationDao().conversations().single() }
+            assertEquals("保留的对话", conversation.title)
+            val provider = runBlocking(Dispatchers.IO) { database.providerDao().providerById("provider-1")!! }
+            assertEquals("CODEX_OAUTH", provider.provider.authMode)
+        } finally {
+            database.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
     fun migration18To19CompletesMissingForkAuthAndMcpColumns() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "fork-v18-${UUID.randomUUID()}.db"

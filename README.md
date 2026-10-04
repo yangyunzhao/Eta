@@ -11,15 +11,15 @@
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| Codex OAuth 设备码登录 | 已发布 `v3.0.2.znmlr.1`；试用候选 `v3.1.0.znmlr.1` 待验证 | 认证、加密凭据、刷新、安全 IPC、Codex Responses 和固定模型目录继续由下游维护；候选合入上游角色、语音、屏幕上下文与聊天改进 |
+| Codex OAuth 设备码登录 | 已发布 `v3.0.2.znmlr.1`；修复候选 `v3.1.0.znmlr.2` 待验证 | 认证、加密凭据、刷新、安全 IPC、Codex Responses 和固定模型目录继续由下游维护；候选合入上游角色、语音、屏幕上下文与聊天改进 |
 
 使用流程是：在内置 OpenAI Provider 选择 `CODEX_OAUTH`，由 Eta 展示设备码并打开固定 OpenAI 验证页，用户授权后应用通过轮询完成登录。整个流程不使用浏览器回调、Deep Link、WebView 或本地 HTTP 回调服务器。当前已验证的可靠路径是让 Eta 保持前台，并在电脑或另一台设备打开 `https://auth.openai.com/codex/device` 输入验证码；部分手机在切到同机浏览器后会回收 Eta 进程，导致本轮内存登录会话丢失。使用者无需再填写 OpenAI Platform API Key，但请求会消耗登录账号的 Codex 共享额度；共享额度不是无限免费，具体可用量受账号与服务策略约束。
 
 当前正式发布版本为 [`v3.0.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.2.znmlr.1)（`versionCode 2026090701`），基于上游 [`v3.0.2`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.2)（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）。tag CI run [`34794064664`](https://github.com/yangyunzhao/Eta/actions/runs/34794064664) 已完成完整单元测试、Lint、签名构建和 APK 校验；公开 Release asset 的 SHA-256 为 `8DA68A5F1534806FE1700AAB006E1F2B7E96F10B1C99F47B3861918C76B44D0D`。用户已完成同证书覆盖安装及一般功能测试并反馈无问题。
 
-当前试用候选合入上游 [`v3.1.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.1.0)（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.1` / `2026100201`。此前的 v3.0.4 候选未完成发布门禁；本次候选须经自动验证和用户安装确认后才会创建 tag 与 GitHub Release。
+当前修复候选合入上游 [`v3.1.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.1.0)（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.2` / `2026100202`。此前的 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后会在启动时闪退，不得继续分发；修复候选须经自动验证和用户安装确认后才会创建 tag 与 GitHub Release。
 
-试用候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 已通过完整单元测试、Lint、既有证书签名构建和 APK 校验。本地试用文件为 `release/Eta-v3.1.0.znmlr.1-release.apk`，SHA-256 为 `3C5D569906EFF9933BED4E68B0FD21DFBED3131AE61D0D9998946EA9FB6B7E9A`；用户安装与功能试用待确认。升级后需在模型提供商设置中手动填写当前模型的上下文窗口大小。
+故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint 和签名构建，但手机日志已确认旧 Fork v19→v21 升级缺列导致启动闪退。修复候选的 CI 与 APK 验证尚未完成；升级后仍需在模型提供商设置中手动填写当前模型的上下文窗口大小。
 
 2026-10-04 已按官方 Codex CLI 稳定版 `rust-v0.160.0`（peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`）静态核对设备码、刷新、模型目录、Responses 请求与 SSE 终态，未发现必须先改协议的差异；`CODEX_PROTOCOL_COMPAT_VERSION` 仍表示已完整验证的 `0.147.0` 基线。真实 OAuth 调用、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需人工验收。
 

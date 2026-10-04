@@ -84,6 +84,18 @@ internal abstract class EtaDatabase : RoomDatabase() {
         }
 
         internal val MIGRATION_19_20 = Migration(19, 20) { database ->
+            // The released fork v19 did not have the upstream runtime context columns.
+            // Restore them before HistoryPayloadMigration reads context_snapshot_json.
+            listOf("runtime_results", "runtime_archive_runs", "runtime_inflight_runs").forEach { table ->
+                addColumnIfMissing(
+                    database, table, "context_snapshot_json",
+                    "ALTER TABLE $table ADD COLUMN context_snapshot_json TEXT NOT NULL DEFAULT ''",
+                )
+                addColumnIfMissing(
+                    database, table, "operation",
+                    "ALTER TABLE $table ADD COLUMN operation TEXT NOT NULL DEFAULT 'chat'",
+                )
+            }
             database.execSQL("ALTER TABLE conversation_context_checkpoints ADD COLUMN journal_json TEXT NOT NULL DEFAULT ''")
             database.execSQL("ALTER TABLE runtime_inflight_runs ADD COLUMN transcript_json TEXT NOT NULL DEFAULT '[]'")
             database.execSQL("CREATE TABLE IF NOT EXISTS agent_text_chunks (" +
