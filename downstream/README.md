@@ -14,12 +14,13 @@
 - [上游 v3.0.2 合并记录](UPSTREAM_V3.0.2_MERGE.md)
 - [上游 v3.0.4 合并记录](UPSTREAM_V3.0.4_MERGE.md)
 - [上游 v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)
+- [v3.1.0.znmlr.2 发布记录](RELEASE_V3.1.0_ZNMLR_2.md)
 
-当前发布版本为 [`v3.0.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.2.znmlr.1) / `2026090701`，基于上游 `v3.0.2`（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）。tag CI [34794064664](https://github.com/yangyunzhao/Eta/actions/runs/34794064664) 已通过完整单元测试、Lint、签名构建和 APK 校验；公开 Release APK SHA-256 为 `8DA68A5F1534806FE1700AAB006E1F2B7E96F10B1C99F47B3861918C76B44D0D`。用户已完成同证书覆盖安装及一般功能测试并反馈无问题。
+当前发布版本为 [`v3.1.0.znmlr.2`](https://github.com/yangyunzhao/Eta/releases/tag/v3.1.0.znmlr.2) / `2026100202`，基于上游 `v3.1.0`（`84d42dc23a328502db9216bfea1fe60590b9e44c`）。[tag CI 37216798359](https://github.com/yangyunzhao/Eta/actions/runs/37216798359) 已通过完整单元测试、Lint、原证书签名构建和 APK 校验；公开 Release APK SHA-256 为 `2365F2885DF297A551B1268AE2B0B56AAE4B50848604EA1D27B06751D71D4451`。用户已完成同证书覆盖安装及基本功能试用。
 
-当前修复候选合入上游 `v3.1.0`（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.2` / `2026100202`。此前 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后启动闪退，不得继续分发；用户验证修复候选后才会创建 tag 与 GitHub Release。证据见 [v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)。
+此前 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后启动闪退，未发布正式 tag/Release；`.znmlr.2` 已修复并经覆盖安装验证。详细原因与迁移证据见[上游 v3.1.0 合并记录](UPSTREAM_V3.1.0_MERGE.md)。
 
-故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint、签名构建和 APK 校验，但真机启动失败。修复候选提交 `f935f6c3f97ca83b56c38d128bbbe65b6a40a467` 的 [CI run 37168306862](https://github.com/yangyunzhao/Eta/actions/runs/37168306862) 已通过完整单元测试、Lint、同证书签名构建和 APK 校验；试用 APK 为 `release/Eta-v3.1.0.znmlr.2-release.apk`，SHA-256 `918E20F66CB6BA2212D48631C63F0B2437F0EE3CB7532F8A848686F7FE21A2A9`。手机覆盖安装与启动验证待完成。升级后需手动填写当前模型的上下文窗口大小。
+故障候选提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过自动测试，但漏测旧下游 v19 直接升级路径。正式版已补齐回归测试；升级后需手动填写当前模型的上下文窗口大小。本地正式 APK 位于 `release/Eta-v3.1.0.znmlr.2-release.apk`，与公开附件哈希一致。
 
 Fork 继续保留上游未覆盖的 Codex OAuth 能力：设备码、AndroidKeyStore 加密凭据、刷新/登出、固定 Codex Responses/模型目录、Runtime 隔离、Room `auth_mode` 与 `ultra` 推理档位。`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 均为历史发布记录。
 

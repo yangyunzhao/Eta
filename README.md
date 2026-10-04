@@ -11,17 +11,17 @@
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| Codex OAuth 设备码登录 | 已发布 `v3.0.2.znmlr.1`；修复候选 `v3.1.0.znmlr.2` 待验证 | 认证、加密凭据、刷新、安全 IPC、Codex Responses 和固定模型目录继续由下游维护；候选合入上游角色、语音、屏幕上下文与聊天改进 |
+| Codex OAuth 设备码登录 | 已发布 `v3.1.0.znmlr.2` | 认证、加密凭据、刷新、安全 IPC、Codex Responses 和固定模型目录继续由下游维护；合入上游角色、语音、屏幕上下文与聊天改进 |
 
 使用流程是：在内置 OpenAI Provider 选择 `CODEX_OAUTH`，由 Eta 展示设备码并打开固定 OpenAI 验证页，用户授权后应用通过轮询完成登录。整个流程不使用浏览器回调、Deep Link、WebView 或本地 HTTP 回调服务器。当前已验证的可靠路径是让 Eta 保持前台，并在电脑或另一台设备打开 `https://auth.openai.com/codex/device` 输入验证码；部分手机在切到同机浏览器后会回收 Eta 进程，导致本轮内存登录会话丢失。使用者无需再填写 OpenAI Platform API Key，但请求会消耗登录账号的 Codex 共享额度；共享额度不是无限免费，具体可用量受账号与服务策略约束。
 
-当前正式发布版本为 [`v3.0.2.znmlr.1`](https://github.com/yangyunzhao/Eta/releases/tag/v3.0.2.znmlr.1)（`versionCode 2026090701`），基于上游 [`v3.0.2`](https://github.com/Mangi-11/Eta/releases/tag/v3.0.2)（`5842a7c47d6c9f4b5580081bcae1f75b110301bc`）。tag CI run [`34794064664`](https://github.com/yangyunzhao/Eta/actions/runs/34794064664) 已完成完整单元测试、Lint、签名构建和 APK 校验；公开 Release asset 的 SHA-256 为 `8DA68A5F1534806FE1700AAB006E1F2B7E96F10B1C99F47B3861918C76B44D0D`。用户已完成同证书覆盖安装及一般功能测试并反馈无问题。
+当前正式发布版本为 [`v3.1.0.znmlr.2`](https://github.com/yangyunzhao/Eta/releases/tag/v3.1.0.znmlr.2)（`versionCode 2026100202`），基于上游 [`v3.1.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.1.0)（`84d42dc23a328502db9216bfea1fe60590b9e44c`）。正式 tag 指向 `f935f6c3f97ca83b56c38d128bbbe65b6a40a467`；[tag CI run 37216798359](https://github.com/yangyunzhao/Eta/actions/runs/37216798359) 已通过完整单元测试、Lint、签名构建和 APK 校验。公开 Release APK 的 SHA-256 为 `2365F2885DF297A551B1268AE2B0B56AAE4B50848604EA1D27B06751D71D4451`，与已发布 v3.0.2 使用同一证书；用户已完成覆盖安装、启动与基本功能试用。
 
-当前修复候选合入上游 [`v3.1.0`](https://github.com/Mangi-11/Eta/releases/tag/v3.1.0)（`84d42dc23a328502db9216bfea1fe60590b9e44c`），目标版本为 `v3.1.0.znmlr.2` / `2026100202`。此前的 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后会在启动时闪退，不得继续分发；修复候选须经自动验证和用户安装确认后才会创建 tag 与 GitHub Release。
+此前的 `.znmlr.1` 试用包覆盖旧 Fork v19 数据库后会在启动时闪退，未发布正式 tag/Release；`.znmlr.2` 已修复该迁移并经真机覆盖安装验证。安装正式 APK 时不要卸载或清除现有应用数据。
 
-故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过完整单元测试、Lint 和签名构建，但手机日志已确认旧 Fork v19→v21 升级缺列导致启动闪退。修复候选源码提交 `f935f6c3f97ca83b56c38d128bbbe65b6a40a467` 的 [CI run 37168306862](https://github.com/yangyunzhao/Eta/actions/runs/37168306862) 已通过完整单元测试、Lint、同证书签名构建和 APK 校验；本地试用 APK 为 `release/Eta-v3.1.0.znmlr.2-release.apk`，SHA-256 `918E20F66CB6BA2212D48631C63F0B2437F0EE3CB7532F8A848686F7FE21A2A9`。手机覆盖安装与启动验证待完成；升级后仍需在模型提供商设置中手动填写当前模型的上下文窗口大小。
+故障候选代码提交 `735c903b982bdcc1fc3afa7f26d0fda2c5a9b1b0` 的 [CI run 37165165365](https://github.com/yangyunzhao/Eta/actions/runs/37165165365) 虽通过自动测试，但漏测旧下游 v19 的直接升级路径。正式版已补齐该回归测试；升级后仍需在模型提供商设置中手动填写当前模型的上下文窗口大小。详细证据见[发布记录](downstream/RELEASE_V3.1.0_ZNMLR_2.md)。
 
-2026-10-04 已按官方 Codex CLI 稳定版 `rust-v0.160.0`（peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`）静态核对设备码、刷新、模型目录、Responses 请求与 SSE 终态，未发现必须先改协议的差异；`CODEX_PROTOCOL_COMPAT_VERSION` 仍表示已完整验证的 `0.147.0` 基线。真实 OAuth 调用、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需人工验收。
+2026-10-04 已按官方 Codex CLI 稳定版 `rust-v0.160.0`（peeled commit `a956835d020762cb2b570053af06f643a11c0ecc`）静态核对设备码、刷新、模型目录、Responses 请求与 SSE 终态，未发现必须先改协议的差异；`CODEX_PROTOCOL_COMPAT_VERSION` 仍表示已完整验证的 `0.147.0` 基线。真实账号的完整边界测试、AndroidKeyStore instrumentation 与注销后的敏感日志计数仍需人工验收。
 
 仓库已经加入下游 CI/发布防护：在 `main`、`v*.znmlr.*` tag 和手动触发时运行，构建前执行 unit test 与 lint，并精确核对 tag、APK 和版本 metadata，发布资产使用版本化名称。该流程不会自动创建 tag、GitHub Release 或执行 push。详细发布步骤见 `.github/RELEASING.md`。
 
@@ -37,12 +37,13 @@
 - [上游 v3.0.2 合并记录](downstream/UPSTREAM_V3.0.2_MERGE.md)
 - [上游 v3.0.4 合并记录](downstream/UPSTREAM_V3.0.4_MERGE.md)
 - [上游 v3.1.0 合并记录](downstream/UPSTREAM_V3.1.0_MERGE.md)
+- [v3.1.0.znmlr.2 发布记录](downstream/RELEASE_V3.1.0_ZNMLR_2.md)
 
 ## 与上游的关系
 
 - `origin`：`https://github.com/yangyunzhao/Eta.git`，用于下游提交和推送。
 - `upstream`：`https://github.com/Mangi-11/Eta.git`，只用于获取上游更新。
-- 后续会持续获取上游更新；没有下游分叉时允许 fast-forward，已经产生下游分叉时使用普通 merge 保留双方历史，不改写已发布提交；当前试用候选基于上游 `v3.1.0` / `84d42dc`，正式发布仍基于 `v3.0.2`。
+- 后续会持续获取上游更新；没有下游分叉时允许 fast-forward，已经产生下游分叉时使用普通 merge 保留双方历史，不改写已发布提交；当前正式发布基于上游 `v3.1.0` / `84d42dc`。
 - 上游 README 的更新合入 `docs/README.md` 和 `docs/README_EN.md`，根 README 继续作为下游入口。
 - 上游许可证继续适用于本 Fork；使用、修改和分发前请阅读 [PolyForm Noncommercial License 1.0.0](LICENSE)。
 
@@ -58,7 +59,7 @@ v<上游版本>.znmlr.<下游序号>
 - 同一上游基线继续发布时递增为 `v2.6.0.znmlr.2`、`v2.6.0.znmlr.3`。
 - 上游升级后序号重置；例如升级到 `v2.7.0` 后从 `v2.7.0.znmlr.1` 开始。
 - `znmlr` 是固定的下游标签，release 和 tag 只发布到个人仓库 `origin`。
-- 当前已发布 `v3.0.2.znmlr.1`，对应 `versionName 3.0.2.znmlr.1` 和 `versionCode 2026090701`；`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 保留为历史发布记录。
+- 当前已发布 `v3.1.0.znmlr.2`，对应 `versionName 3.1.0.znmlr.2` 和 `versionCode 2026100202`；`v3.0.2.znmlr.1`、`v3.0.0.znmlr.1`、`v2.6.5.znmlr.1`、`v2.6.2.znmlr.1` 与 `v2.6.0.znmlr.1` 保留为历史发布记录。
 
 ## 当前开发原则
 
